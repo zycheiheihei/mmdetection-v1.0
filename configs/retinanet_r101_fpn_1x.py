@@ -92,8 +92,8 @@ data = dict(
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file='/home/fengyao/mmdetection/mmdet/datasets/coco/annotations.json',
-        img_prefix='/home/fengyao/mmdetection/mmdet/datasets/coco/JPEGImages/',
+        ann_file='/home/fengyao/MSCOCO2017dataset/train/annotations/instances_val2017.json',
+        img_prefix='/home/fengyao/MSCOCO2017dataset/val/val2017',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
@@ -120,7 +120,7 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-total_epochs = 1
+total_epochs = 12
 device_ids = range(8)
 dist_params = dict(backend='nccl')
 log_level = 'INFO'

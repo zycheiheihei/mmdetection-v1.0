@@ -1,10 +1,9 @@
 from __future__ import division
 import argparse
 import os
-
+from mmdet import __version__
 import torch
 from mmcv import Config
-from mmdet import __version__
 from train import parse_args,train
 
 
