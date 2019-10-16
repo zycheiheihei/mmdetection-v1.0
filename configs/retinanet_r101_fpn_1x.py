@@ -54,7 +54,7 @@ test_cfg = dict(
     max_per_img=100)
 # dataset settings
 dataset_type = 'CocoDataset'
-data_root = 'data/coco/'
+data_root = '/home/fengyao/MSCOCO2017dataset'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -87,18 +87,18 @@ data = dict(
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file='/home/fengyao/MSCOCO2017dataset/train/annotations/instances_train2017.json',
-        img_prefix='/home/fengyao/MSCOCO2017dataset/train/train2017',
+        ann_file=data_root + '/train/annotations/instances_train2017.json',
+        img_prefix=data_root + '/train/train2017/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file='/home/fengyao/MSCOCO2017dataset/train/annotations/instances_val2017.json',
-        img_prefix='/home/fengyao/MSCOCO2017dataset/val/val2017',
+        ann_file=data_root + '/val/annotations/instances_val2017.json',
+        img_prefix=data_root + '/val/val2017/',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file='/home/fengyao/mmdetection/mmdet/datasets/coco/annotations.json',
-        img_prefix='/home/fengyao/mmdetection/mmdet/datasets/coco/JPEGImages/',
+        ann_file=data_root + '/val/annotations/instances_val2017.json',
+        img_prefix=data_root + '/val/val2017/',
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
