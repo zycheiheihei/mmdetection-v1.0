@@ -104,7 +104,7 @@ test_cfg = dict(
         score_thr=0.05, nms=dict(type='nms', iou_thr=0.5), max_per_img=100))
 # dataset settings
 dataset_type = 'CocoDataset'
-data_root = 'data/coco/'
+data_root = '/home/fengyao/MSCOCO2017dataset'
 img_norm_cfg = dict(
     mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
 train_pipeline = [
@@ -137,18 +137,18 @@ data = dict(
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_train2017.json',
-        img_prefix=data_root + 'train2017/',
+        ann_file=data_root + '/train/annotations/instances_train2017.json',
+        img_prefix=data_root + '/train/train2017/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_val2017.json',
-        img_prefix=data_root + 'val2017/',
+        ann_file=data_root + '/val/annotations/instances_val2017.json',
+        img_prefix=data_root + '/val/val2017/',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_val2017.json',
-        img_prefix=data_root + 'val2017/',
+        ann_file=data_root + '/val/annotations/instances_val2017.json',
+        img_prefix=data_root + '/val/val2017/',
         pipeline=test_pipeline))
 # optimizer
 optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)

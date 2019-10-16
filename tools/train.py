@@ -15,8 +15,7 @@ import pdb
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
-    parser.add_argument('--config', help='train config file path', default='/home/fengyao/mmdetection/configs/'
-                                                                           'mask_rcnn_r50_fpn_1x.py')
+    parser.add_argument('--config', help='train config file path', default='/home/fengyao/mmdetection/configs/')
     parser.add_argument('--work_dir', help='the dir to save logs and models')
     parser.add_argument(
         '--resume_from', help='the checkpoint file to resume from')
@@ -43,6 +42,7 @@ def parse_args():
         help='automatically scale lr with the number of gpus')
     parser.add_argument('--model_name', help='name of loaded model', default='mask_rcnn_r50_fpn_1x')
     args = parser.parse_args()
+    args.config += args.model_name + '.py'
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
 
