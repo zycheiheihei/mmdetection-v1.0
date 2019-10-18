@@ -1,17 +1,25 @@
 from __future__ import division
 import re
 from collections import OrderedDict
-
 import torch
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import DistSamplerSeedHook, Runner, obj_from_dict
-
+from mmdet.apis.inference import LoadImage
 from mmdet import datasets
+from mmdet.datasets.pipelines import Compose
 from mmdet.core import (CocoDistEvalmAPHook, CocoDistEvalRecallHook,
                         DistEvalmAPHook, DistOptimizerHook, Fp16OptimizerHook)
 from mmdet.datasets import DATASETS, build_dataloader
 from mmdet.models import RPN
 from .env import get_root_logger
+import pdb
+from tools.attack import visualize_img, load_model
+import datetime
+import numpy as np
+from tqdm import tqdm
+import os
+from skimage import transform
+from tqdm import *
 
 
 def parse_losses(losses):
@@ -225,3 +233,55 @@ def _non_dist_train(model, dataset, cfg, validate=False):
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)
     runner.run(data_loaders, cfg.workflow, cfg.total_epochs)
+
+def attack_detector(args, model, cfg, dataset):
+    cfg.data.workers_per_gpu = 0
+    cfg.data.imgs_per_gpu = 1
+    infer_model = load_model(args)
+    attack_loader = build_dataloader(dataset, cfg.data.imgs_per_gpu, cfg.data.workers_per_gpu, cfg.gpus, dist=False)
+    model = MMDataParallel(model, device_ids=range(cfg.gpus)).cuda()
+    if args.clear_output:
+        file_list = os.listdir(args.save_path)
+        for f in file_list:
+            os.remove(os.path.join(args.save_path, f))
+    pbar_outer = tqdm(total=attack_loader.__len__())
+    pbar_inner = tqdm(total=args.num_attack_iter)
+    for i, data in enumerate(attack_loader):
+        imgs = data['img'].data[0].cuda()
+        raw_imgs = data['img'].data[0]
+        raw_filename = data['img_meta'].data[0][0]['filename']
+        imgs_mean = data['img_meta'].data[0][0]['img_norm_cfg']['mean']
+        imgs_std = data['img_meta'].data[0][0]['img_norm_cfg']['std']
+        pbar_inner.reset()
+        for _ in range(args.num_attack_iter):
+            imgs = imgs.detach()
+            imgs.requires_grad = True
+            result = model(imgs, data['img_meta'], return_loss=True,
+                           gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
+            #keys = ['loss_rpn_cls', 'loss_rpn_bbox', 'loss_cls', 'loss_bbox']
+            keys = list(result.keys())
+            keys.remove('acc')
+            for key in keys:
+                if type(result[key]) is list:
+                    for loss in result[key]:
+                        loss.backward(retain_graph=True)
+                else:
+                    result[key].backward(retain_graph=True)
+            imgs = imgs + args.epsilon / args.num_attack_iter * imgs.grad / torch.max(torch.abs(imgs.grad))
+            result[keys[0]][0].backward()
+            model.zero_grad()
+            pbar_inner.update(1)
+        imgs = imgs.detach().cpu().numpy()[0]
+        raw_imgs = raw_imgs.numpy()[0]
+        for k in range(0, 3):
+            imgs[k] = imgs[k] * imgs_std[k] + imgs_mean[k]
+            raw_imgs[k] = raw_imgs[k] * imgs_std[k] + imgs_mean[k]
+        imgs = imgs[[2, 1, 0]]
+        raw_imgs = raw_imgs[[2, 1, 0]]
+        imgs = imgs.transpose(1, 2, 0)
+        raw_imgs = raw_imgs.transpose(1, 2, 0)
+        (_, filename) = os.path.split(raw_filename)
+        visualize_img(infer_model, raw_imgs, args.save_path + filename)
+        visualize_img(infer_model, imgs, args.save_path + 'attack_' + filename)
+        pbar_outer.update(1)
+    pbar_outer.close()

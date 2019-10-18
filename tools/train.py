@@ -1,52 +1,15 @@
 from __future__ import division
 import argparse
 import os
-
 import torch
 from mmcv import Config
-
 from mmdet import __version__
 from mmdet.apis import (get_root_logger, init_dist, set_random_seed,
                         train_detector)
 from mmdet.datasets import build_dataset
 from mmdet.models import build_detector
 import pdb
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Train a detector')
-    parser.add_argument('--config', help='train config file path', default='/home/fengyao/mmdetection/configs/')
-    parser.add_argument('--work_dir', help='the dir to save logs and models')
-    parser.add_argument(
-        '--resume_from', help='the checkpoint file to resume from')
-    parser.add_argument(
-        '--validate',
-        action='store_true',
-        help='whether to evaluate the checkpoint during training')
-    parser.add_argument(
-        '--gpus',
-        type=int,
-        default=1,
-        help='number of gpus to use '
-        '(only applicable to non-distributed training)')
-    parser.add_argument('--seed', type=int, default=None, help='random seed')
-    parser.add_argument(
-        '--launcher',
-        choices=['none', 'pytorch', 'slurm', 'mpi'],
-        default='none',
-        help='job launcher')
-    parser.add_argument('--local_rank', type=int, default=0)
-    parser.add_argument(
-        '--autoscale-lr',
-        action='store_true',
-        help='automatically scale lr with the number of gpus')
-    parser.add_argument('--model_name', help='name of loaded model', default='mask_rcnn_r50_fpn_1x')
-    args = parser.parse_args()
-    args.config += args.model_name + '.py'
-    if 'LOCAL_RANK' not in os.environ:
-        os.environ['LOCAL_RANK'] = str(args.local_rank)
-
-    return args
+from parsing import parse_args
 
 
 def train(args):
@@ -57,6 +20,8 @@ def train(args):
     # update configs according to CLI args
     if args.work_dir is not None:
         cfg.work_dir = args.work_dir
+    else:
+        args.work_dir = cfg.work_dir
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
     cfg.gpus = args.gpus
@@ -103,8 +68,7 @@ def train(args):
         distributed=distributed,
         validate=args.validate,
         logger=logger)
-    pdb.set_trace()
-    torch.save(model, args.work_dir + "/" + args.model_name)
+    torch.save(model, args.work_dir + '/' + args.model_name + '.pth')
     return
 
 

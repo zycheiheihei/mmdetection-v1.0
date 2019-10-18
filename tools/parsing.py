@@ -1,0 +1,52 @@
+import argparse
+import os
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train a detector')
+    parser.add_argument('--config', help='train config file path', default='/home/fengyao/mmdetection/configs/')
+    parser.add_argument('--work_dir', help='the dir to save logs and models')
+    parser.add_argument(
+        '--resume_from', help='the checkpoint file to resume from')
+    parser.add_argument(
+        '--validate',
+        action='store_true',
+        help='whether to evaluate the checkpoint during training')
+    parser.add_argument(
+        '--gpus',
+        type=int,
+        default=1,
+        help='number of gpus to use '
+        '(only applicable to non-distributed training)')
+    parser.add_argument('--seed', type=int, default=None, help='random seed')
+    parser.add_argument(
+        '--launcher',
+        choices=['none', 'pytorch', 'slurm', 'mpi'],
+        default='none',
+        help='job launcher')
+    parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument(
+        '--autoscale-lr',
+        action='store_true',
+        help='automatically scale lr with the number of gpus')
+    parser.add_argument('--model_name', help='name of loaded model', default='mask_rcnn_r50_fpn_1x')
+    parser.add_argument('--train', action='store_true', help='whether or not to train')
+    parser.add_argument('--clear_output', action='store_true', help='whether or not to clear output path')
+    parser.add_argument('--model_path', type=str, default=None)
+    parser.add_argument('--num_attack_iter', type=int, default=10)
+    parser.add_argument('--epsilon', type=float, default=5.0)
+    args = parser.parse_args()
+    args.config += args.model_name + '.py'
+    if 'LOCAL_RANK' not in os.environ:
+        os.environ['LOCAL_RANK'] = str(args.local_rank)
+    if 'RANK' not in os.environ:
+        os.environ['RANK'] = str(args.local_rank)
+    if 'WORLD_SIZE' not in os.environ:
+        os.environ['WORLD_SIZE'] = str(1)
+    if 'MASTER_PORT' not in os.environ:
+        os.environ['MASTER_PORT'] = str(22225)
+    if 'MASTER_ADDR' not in os.environ:
+        os.environ['MASTER_ADDR'] = '101.6.240.88'
+    if 'NPROC_PER_NODE' not in os.environ:
+        os.environ['NPROC_PER_NODE'] = str(args.gpus)
+    return args
