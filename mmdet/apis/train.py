@@ -234,6 +234,7 @@ def _non_dist_train(model, dataset, cfg, validate=False):
         runner.load_checkpoint(cfg.load_from)
     runner.run(data_loaders, cfg.workflow, cfg.total_epochs)
 
+
 def attack_detector(args, model, cfg, dataset):
     cfg.data.workers_per_gpu = 0
     cfg.data.imgs_per_gpu = 1
@@ -244,22 +245,29 @@ def attack_detector(args, model, cfg, dataset):
         file_list = os.listdir(args.save_path)
         for f in file_list:
             os.remove(os.path.join(args.save_path, f))
-    pbar_outer = tqdm(total=attack_loader.__len__())
+    max_batch = min(attack_loader.__len__(), args.max_attack_batches)
+    pbar_outer = tqdm(total=max_batch)
     pbar_inner = tqdm(total=args.num_attack_iter)
+    acc_before_attack = 0
+    acc_under_attack = 0
     for i, data in enumerate(attack_loader):
+        if i >= max_batch:
+            break
         imgs = data['img'].data[0].cuda()
         raw_imgs = data['img'].data[0]
         raw_filename = data['img_meta'].data[0][0]['filename']
         imgs_mean = data['img_meta'].data[0][0]['img_norm_cfg']['mean']
         imgs_std = data['img_meta'].data[0][0]['img_norm_cfg']['std']
         pbar_inner.reset()
+        acc_list = []
         for _ in range(args.num_attack_iter):
             imgs = imgs.detach()
             imgs.requires_grad = True
             result = model(imgs, data['img_meta'], return_loss=True,
                            gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
-            #keys = ['loss_rpn_cls', 'loss_rpn_bbox', 'loss_cls', 'loss_bbox']
+            pdb.set_trace()
             keys = list(result.keys())
+            acc_list.append(result['acc'])
             keys.remove('acc')
             for key in keys:
                 if type(result[key]) is list:
@@ -271,6 +279,8 @@ def attack_detector(args, model, cfg, dataset):
             result[keys[0]][0].backward()
             model.zero_grad()
             pbar_inner.update(1)
+        acc_before_attack += acc_list[0]
+        acc_under_attack += acc_list[-1]
         imgs = imgs.detach().cpu().numpy()[0]
         raw_imgs = raw_imgs.numpy()[0]
         for k in range(0, 3):
@@ -285,3 +295,9 @@ def attack_detector(args, model, cfg, dataset):
         visualize_img(infer_model, imgs, args.save_path + 'attack_' + filename)
         pbar_outer.update(1)
     pbar_outer.close()
+    pbar_inner.close()
+    acc_before_attack /= max_batch
+    acc_under_attack /= max_batch
+    print("Accuracy before attack = %g" % acc_before_attack)
+    print("Accuracy under attack = %g" % acc_under_attack)
+    print("Accuracy decrease = %g" % (acc_before_attack - acc_under_attack))

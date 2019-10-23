@@ -29,6 +29,7 @@ def load_model(args):
     model.eval()
     return model
 
+
 def visualize():
     args = parse_args()
     model = load_model(args)
@@ -37,8 +38,8 @@ def visualize():
     imgs = ['000000000001.jpg',
             '000000000016.jpg']
     for i in range(0, len(imgs)):
-        result = inference_detector(model,root + imgs[i])
-        show_result(root + imgs[i], result, model.CLASSES,show=False,out_file=save_path + imgs[i])
+        result = inference_detector(model, root + imgs[i])
+        show_result(root + imgs[i], result, model.CLASSES, show=False, out_file=save_path + imgs[i])
     print('[INFO]Done.')
 
 
@@ -93,6 +94,7 @@ def attack():
     model.CLASSES = datasets[0].CLASSES
     attack_detector(args, model, cfg, datasets[0])
     return
+
 
 if __name__ == "__main__":
     #visualize()
