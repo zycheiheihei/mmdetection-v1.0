@@ -20,6 +20,8 @@ from tqdm import tqdm
 import os
 from skimage import transform
 import copy
+import threading
+from datetime import datetime
 
 
 def parse_losses(losses):
@@ -236,9 +238,9 @@ def _non_dist_train(model, dataset, cfg, validate=False):
 
 
 def attack_detector(args, model, cfg, dataset):
-    print("Gpus:", cfg.gpus)
-    print("Imgs per gpu:", cfg.data.imgs_per_gpu)
-    print("Workers per gpu:", cfg.data.workers_per_gpu)
+    print(str(datetime.now()) + ' - INFO - GPUs: ', cfg.gpus)
+    print(str(datetime.now()) + ' - INFO - Imgs per GPU: ', cfg.data.imgs_per_gpu)
+    print(str(datetime.now()) + ' - INFO - Workers per GPU: ', cfg.data.workers_per_gpu)
     infer_model = load_model(args)
     attack_loader = build_dataloader(dataset, cfg.data.imgs_per_gpu, cfg.data.workers_per_gpu, cfg.gpus, dist=False)
     model = MMDataParallel(model, device_ids=range(cfg.gpus)).cuda()
@@ -290,7 +292,11 @@ def attack_detector(args, model, cfg, dataset):
         acc_before_attack += acc_list[0]
         acc_under_attack += acc_list[-1]
         for j in range(0, cfg.gpus):
-            visualize_all_images(args, infer_model, imgs.data[j], raw_imgs.data[j], data['img_meta'].data[j])
+            t = threading.Thread(target=visualize_all_images, args=(args, infer_model, imgs.data[j],
+                                                                    raw_imgs.data[j], data['img_meta'].data[j]))
+            t.start()
+            print('Thread' + str(j) + 'started')
+            t.join()
         pbar_outer.update(1)
     pbar_outer.close()
     pbar_inner.close()
