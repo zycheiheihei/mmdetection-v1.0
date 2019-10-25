@@ -49,6 +49,27 @@ def visualize_img(model, img, save_path):
     return
 
 
+def visualize_all_images(args, model, imgs, raw_imgs, metadata):
+    imgs = imgs.detach().cpu().numpy()
+    raw_imgs = raw_imgs.numpy()
+    imgs = imgs.transpose(0, 2, 3, 1)
+    raw_imgs = raw_imgs.transpose(0, 2, 3, 1)
+    imgs = imgs[:, :, :, [2, 1, 0]]
+    raw_imgs = raw_imgs[:, :, :, [2, 1, 0]]
+    for index in range(0, np.shape(imgs)[0]):
+        raw_filename = metadata[index]['filename']
+        imgs_mean = metadata[index]['img_norm_cfg']['mean']
+        imgs_std = metadata[index]['img_norm_cfg']['std']
+        for k in range(0, 3):
+            imgs[index][:, :, k] = imgs[index][:, :, k] * imgs_std[2 - k] + imgs_mean[2 - k]
+            raw_imgs[index][:, :, k] = raw_imgs[index][:, :, k] * imgs_std[2 - k] + imgs_mean[2 - k]
+        (_, filename) = os.path.split(raw_filename)
+        filename = filename.split('.', 2)[0]
+        visualize_img(model, raw_imgs[index], args.save_path + filename + '.jpg')
+        visualize_img(model, imgs[index], args.save_path + filename + '_attack' + '.jpg')
+    return
+
+
 def attack():
     args = parse_args()
     cfg = Config.fromfile(args.config)

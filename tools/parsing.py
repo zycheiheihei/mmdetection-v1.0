@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument('--train', action='store_true', help='whether or not to train')
     parser.add_argument('--clear_output', action='store_true', help='whether or not to clear output path')
     parser.add_argument('--model_path', type=str, default=None)
-    parser.add_argument('--num_attack_iter', type=int, default=10)
+    parser.add_argument('--num_attack_iter', type=int, default=5)
     parser.add_argument('--epsilon', type=float, default=5.0)
     args = parser.parse_args()
     args.config += args.model_name + '.py'
