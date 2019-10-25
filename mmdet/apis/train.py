@@ -236,8 +236,9 @@ def _non_dist_train(model, dataset, cfg, validate=False):
 
 
 def attack_detector(args, model, cfg, dataset):
-    cfg.data.workers_per_gpu = 0
-    cfg.data.imgs_per_gpu = 4
+    print("Gpus:", cfg.gpus)
+    print("Imgs per gpu:", cfg.data.imgs_per_gpu)
+    print("Workers per gpu:", cfg.data.workers_per_gpu)
     infer_model = load_model(args)
     attack_loader = build_dataloader(dataset, cfg.data.imgs_per_gpu, cfg.data.workers_per_gpu, cfg.gpus, dist=False)
     model = MMDataParallel(model, device_ids=range(cfg.gpus)).cuda()
@@ -250,54 +251,40 @@ def attack_detector(args, model, cfg, dataset):
     pbar_inner = tqdm(total=args.num_attack_iter)
     acc_before_attack = 0
     acc_under_attack = 0
+    keys = []
     for i, data in enumerate(attack_loader):
         if i >= max_batch:
             break
-        if cfg.gpus == 1:
-            if data['img'].data[0].size()[0] > 1:
-                imgs = torch.cat(tuple(data['img'].data), 0).cuda()
-                raw_imgs = torch.cat(tuple(data['img'].data), 0)
-            else:
-                imgs = data['img'].data[0].cuda()
-                raw_imgs = data['img'].data[0]
-        else:
-            raw_imgs = copy.deepcopy(data['img'])
-            imgs = data['img']
-            for j in range(0, len(imgs.data)):
-                imgs.data[j] = imgs.data[j].cuda()
-                imgs.data[j] = imgs.data[j].detach()
-                imgs.data[j].requires_grad = True
+        raw_imgs = copy.deepcopy(data['img'])
+        imgs = data['img']
+        for j in range(0, len(imgs.data)):
+            imgs.data[j] = imgs.data[j].cuda()
+            imgs.data[j] = imgs.data[j].detach()
+            imgs.data[j].requires_grad = True
         pbar_inner.reset()
         acc_list = []
         for _ in range(args.num_attack_iter):
-            result = model(imgs, data['img_meta'], return_loss=True, gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
-            keys = list(result.keys())
+            result = model(imgs, data['img_meta'], return_loss=True,
+                           gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
+            if i == 0:
+                keys = list(result.keys())
+                keys.remove('acc')
+                keys.remove('loss_bbox')
             acc_list.append(result['acc'].mean())
-            keys.remove('acc')
+            loss = 0
             for key in keys:
                 if type(result[key]) is list:
-                    if len(result[key][0]) > 1:
-                        for losses in result[key]:
-                            for loss in losses:
-                                loss.backward(retain_graph=True)
-                    else:
-                        for loss in result[key]:
-                            loss.backward(retain_graph=True)
+                    for losses in result[key]:
+                        loss += losses.sum()
                 else:
-                    if len(result[key]) > 1:
-                        for loss in result[key]:
-                            loss.backward(retain_graph=True)
-                    else:
-                        result[key].backward(retain_graph=True)
+                    loss += result[key].sum()
+            loss.backward(retain_graph=True)
+            result['loss_bbox'].sum().backward()
             for j in range(0, len(imgs.data)):
                 imgs.data[j] = imgs.data[j] + args.epsilon / args.num_attack_iter * imgs.data[j].grad \
                                / torch.max(torch.abs(imgs.data[j].grad))
                 imgs.data[j] = imgs.data[j].detach()
                 imgs.data[j].requires_grad = True
-            if cfg.gpus > 1:
-                result[keys[0]][0][0].backward()
-            else:
-                result[keys[0]][0].backward()
             model.zero_grad()
             pbar_inner.update(1)
         acc_before_attack += acc_list[0]

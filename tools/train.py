@@ -14,6 +14,8 @@ from parsing import parse_args
 
 def train(args):
     cfg = Config.fromfile(args.config)
+    cfg.data.workers_per_gpu = args.workers_per_gpu
+    cfg.data.imgs_per_gpu = args.imgs_per_gpu
     # set cudnn_benchmark
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
