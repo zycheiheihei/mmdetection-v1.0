@@ -13,7 +13,7 @@ from mmdet.datasets import DATASETS, build_dataloader
 from mmdet.models import RPN
 from .env import get_root_logger
 import pdb
-from tools.attack import visualize_all_images, load_model
+from tools.attack import load_model, visualize_all_images, visualize_all_images_plus_acc
 import datetime
 import numpy as np
 from tqdm import tqdm
@@ -22,6 +22,21 @@ from skimage import transform
 import copy
 import threading
 from datetime import datetime
+
+
+class ThreadingWithResult(threading.Thread):
+
+    def __init__(self, func, args=()):
+        super(ThreadingWithResult, self).__init__()
+        self.func = func
+        self.args = args
+        self.result = np.zeros(4)
+
+    def run(self):
+        self.result = self.func(*self.args)
+
+    def get_result(self):
+        return self.result
 
 
 def parse_losses(losses):
@@ -241,6 +256,7 @@ def attack_detector(args, model, cfg, dataset):
     print(str(datetime.now()) + ' - INFO - GPUs: ', cfg.gpus)
     print(str(datetime.now()) + ' - INFO - Imgs per GPU: ', cfg.data.imgs_per_gpu)
     print(str(datetime.now()) + ' - INFO - Workers per GPU: ', cfg.data.workers_per_gpu)
+    print(str(datetime.now()) + ' - INFO - Momentum: ', args.momentum)
     infer_model = load_model(args)
     attack_loader = build_dataloader(dataset, cfg.data.imgs_per_gpu, cfg.data.workers_per_gpu, cfg.gpus, dist=False)
     model = MMDataParallel(model, device_ids=range(cfg.gpus)).cuda()
@@ -254,6 +270,8 @@ def attack_detector(args, model, cfg, dataset):
     acc_before_attack = 0
     acc_under_attack = 0
     keys = []
+    statistics = np.zeros(4)
+    number_of_images = 0
     for i, data in enumerate(attack_loader):
         if i >= max_batch:
             break
@@ -263,6 +281,7 @@ def attack_detector(args, model, cfg, dataset):
             imgs.data[j] = imgs.data[j].cuda()
             imgs.data[j] = imgs.data[j].detach()
             imgs.data[j].requires_grad = True
+            number_of_images += imgs.data[j].size()[0]
         pbar_inner.reset()
         acc_list = []
         for _ in range(args.num_attack_iter):
@@ -282,9 +301,23 @@ def attack_detector(args, model, cfg, dataset):
                     loss += result[key].sum()
             loss.backward(retain_graph=True)
             result['loss_bbox'].sum().backward()
+            last_update_direction = list(range(0, len(imgs.data)))
             for j in range(0, len(imgs.data)):
-                imgs.data[j] = imgs.data[j] + args.epsilon / args.num_attack_iter * imgs.data[j].grad \
-                               / torch.max(torch.abs(imgs.data[j].grad))
+                if args.momentum == 0:
+                    update_direction = imgs.data[j].grad
+                    imgs.data[j] = imgs.data[j] + args.epsilon / args.\
+                        num_attack_iter * update_direction / torch.max(torch.abs(update_direction))
+                else:
+                    if _ == 0:
+                        update_direction = imgs.data[j].grad
+                        last_update_direction[j] = update_direction
+                        imgs.data[j] = imgs.data[j] + args.epsilon / args. \
+                            num_attack_iter * update_direction / torch.max(torch.abs(update_direction))
+                    else:
+                        update_direction = imgs.data[j].grad + args.momentum * last_update_direction[j]
+                        last_update_direction[j] = update_direction
+                        imgs.data[j] = imgs.data[j] + args.epsilon / args. \
+                            num_attack_iter * update_direction / torch.max(torch.abs(update_direction))
                 imgs.data[j] = imgs.data[j].detach()
                 imgs.data[j].requires_grad = True
             model.zero_grad()
@@ -292,16 +325,24 @@ def attack_detector(args, model, cfg, dataset):
         acc_before_attack += acc_list[0]
         acc_under_attack += acc_list[-1]
         for j in range(0, cfg.gpus):
-            t = threading.Thread(target=visualize_all_images, args=(args, infer_model, imgs.data[j],
-                                                                    raw_imgs.data[j], data['img_meta'].data[j]))
+            t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
+                                                                         imgs.data[j], raw_imgs.data[j],
+                                                                         data['img_meta'].data[j],
+                                                                         data['gt_bboxes'].data[0][j],
+                                                                         data['gt_labels'].data[0][j]))
             t.start()
-            print('Thread' + str(j) + 'started')
+            # print('Thread' + str(j) + 'started')
             t.join()
+            statistics += t.get_result()
         pbar_outer.update(1)
     pbar_outer.close()
     pbar_inner.close()
     acc_before_attack /= max_batch
     acc_under_attack /= max_batch
-    print("Accuracy before attack = %g" % acc_before_attack)
-    print("Accuracy under attack = %g" % acc_under_attack)
-    print("Accuracy decrease = %g" % (acc_before_attack - acc_under_attack))
+    statistics /= number_of_images
+    # print("Accuracy before attack = %g" % acc_before_attack)
+    # print("Accuracy under attack = %g" % acc_under_attack)
+    # print("Accuracy decrease = %g" % (acc_before_attack - acc_under_attack))
+    print("Class & IoU accuracy before attack = %g %g" % (statistics[0], statistics[1]))
+    print("Class & IoU accuracy under attack = %g %g" % (statistics[2], statistics[3]))
+    print("Class & IoU accuracy decrease = %g %g" % (statistics[0] - statistics[2], statistics[1] - statistics[3]))

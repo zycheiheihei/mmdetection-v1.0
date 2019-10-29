@@ -6,7 +6,7 @@ import torch
 from mmcv import Config
 from parsing import parse_args
 from train import *
-from mmdet.apis import init_detector, inference_detector, show_result
+from mmdet.apis import init_detector, inference_detector, show_result, show_result_plus_acc
 from mmdet.apis import get_root_logger, init_dist, set_random_seed
 from mmdet.apis.train import *
 import pdb
@@ -68,6 +68,37 @@ def visualize_all_images(args, model, imgs, raw_imgs, metadata):
         visualize_img(model, raw_imgs[index], args.save_path + filename + '.jpg')
         visualize_img(model, imgs[index], args.save_path + filename + '_attack' + '.jpg')
     return
+
+
+def visualize_img_plus_acc(model, img, metadata, gt_bboxes, gt_labels, save_path):
+    img = img.transpose(1, 2, 0)
+    img = img[:, :, [2, 1, 0]]
+    img_mean = metadata['img_norm_cfg']['mean']
+    img_std = metadata['img_norm_cfg']['std']
+    for k in range(0, 3):
+        img[:, :, k] = img[:, :, k] * img_std[2 - k] + img_mean[2 - k]
+    result = inference_detector(model, img)
+    return show_result_plus_acc(img, result, model.CLASSES, gt_bboxes, gt_labels, show=False, out_file=save_path)
+
+
+def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bboxes, gt_labels):
+    imgs = imgs.detach().cpu().numpy()
+    raw_imgs = raw_imgs.numpy()
+    raw_class_acc, raw_iou_acc = 0, 0
+    class_acc, iou_acc = 0, 0
+    for index in range(0, np.shape(imgs)[0]):
+        raw_filename = metadata[index]['filename']
+        (_, filename) = os.path.split(raw_filename)
+        filename = filename.split('.', 2)[0]
+        raw_class_acc_image, raw_iou_acc_image = visualize_img_plus_acc(
+            model, raw_imgs[index], metadata[index], gt_bboxes, gt_labels, args.save_path + filename)
+        class_acc_image, iou_acc_image = visualize_img_plus_acc(
+            model, imgs[index], metadata[index], gt_bboxes, gt_labels, args.save_path + filename + '_attack')
+        raw_class_acc += raw_class_acc_image
+        raw_iou_acc += raw_iou_acc_image
+        class_acc += class_acc_image
+        iou_acc += iou_acc_image
+    return np.array([raw_class_acc, raw_iou_acc, class_acc, iou_acc])
 
 
 def attack():
