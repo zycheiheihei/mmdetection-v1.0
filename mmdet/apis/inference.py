@@ -148,20 +148,12 @@ def show_result(img,
 
 
 def iou(bbox1, bbox2):
-    assert bbox1[0] < bbox1[2]
-    assert bbox1[1] < bbox1[3]
-    assert bbox2[0] < bbox2[2]
-    assert bbox2[1] < bbox2[3]
     overlap_left = max(bbox1[0], bbox2[0])
     overlap_right = min(bbox1[2], bbox2[2])
     overlap_bottom = max(bbox1[1], bbox2[1])
     overlap_top = min(bbox1[3], bbox2[3])
     if overlap_left >= overlap_right or overlap_top <= overlap_bottom:
         return 0
-    # left_top1 = (bbox1[0], bbox1[1])
-    # right_bottom1 = (bbox1[2], bbox1[3])
-    # left_top2 = (bbox2[0], bbox2[1])
-    # right_bottom2 = (bbox2[2], bbox2[3])
     else:
         area1 = (bbox1[2] - bbox1[0]) * (bbox1[3] - bbox1[1])
         area2 = (bbox2[2] - bbox2[0]) * (bbox2[3] - bbox2[1])
@@ -213,6 +205,17 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
         for i, bbox in enumerate(bbox_result)
     ]
     labels = np.concatenate(labels)
+    gt_bboxes = torch.cat((gt_bboxes, torch.ones(gt_bboxes.size()[0], 1)), 1).numpy()
+    gt_labels = gt_labels.numpy() - 1
+    mmcv.imshow_det_bboxes(
+        img.copy(),
+        gt_bboxes,
+        gt_labels,
+        class_names=class_names,
+        score_thr=score_thr,
+        show=show,
+        wait_time=wait_time,
+        out_file=out_file + '_gt.jpg')
     mmcv.imshow_det_bboxes(
         img,
         bboxes,
@@ -222,17 +225,6 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
         show=show,
         wait_time=wait_time,
         out_file=out_file + '.jpg')
-    gt_bboxes = torch.cat((gt_bboxes, torch.ones(gt_bboxes.size()[0], 1)), 1).numpy()
-    gt_labels = gt_labels.numpy() - 1
-    mmcv.imshow_det_bboxes(
-        img,
-        gt_bboxes,
-        gt_labels,
-        class_names=class_names,
-        score_thr=score_thr,
-        show=show,
-        wait_time=wait_time,
-        out_file=out_file + '_gt.jpg')
     indexes = np.where(bboxes[:, -1] > score_thr)[0]
     bboxes = bboxes[indexes]
     labels = labels[indexes]

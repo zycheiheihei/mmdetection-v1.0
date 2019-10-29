@@ -30,7 +30,7 @@ class ThreadingWithResult(threading.Thread):
         super(ThreadingWithResult, self).__init__()
         self.func = func
         self.args = args
-        self.result = np.zeros(4)
+        self.result = -1 * np.ones(4)
 
     def run(self):
         self.result = self.func(*self.args)
@@ -273,6 +273,7 @@ def attack_detector(args, model, cfg, dataset):
     statistics = np.zeros(4)
     number_of_images = 0
     for i, data in enumerate(attack_loader):
+        epsilon = args.epsilon / max(data['img_meta'].data[0][0]['img_norm_cfg']['std'])
         if i >= max_batch:
             break
         raw_imgs = copy.deepcopy(data['img'])
@@ -305,19 +306,31 @@ def attack_detector(args, model, cfg, dataset):
             for j in range(0, len(imgs.data)):
                 if args.momentum == 0:
                     update_direction = imgs.data[j].grad
-                    imgs.data[j] = imgs.data[j] + args.epsilon / args.\
-                        num_attack_iter * update_direction / torch.max(torch.abs(update_direction))
+                    max_per_img = torch.max(torch.max(torch.max(torch.abs(update_direction), 1)[0], 1)[0], 1)[0]
+                    max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:2])
+                    max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:3])
+                    max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:4])
+                    imgs.data[j] = imgs.data[j] + epsilon / args.\
+                        num_attack_iter * update_direction / max_per_img
                 else:
                     if _ == 0:
                         update_direction = imgs.data[j].grad
                         last_update_direction[j] = update_direction
-                        imgs.data[j] = imgs.data[j] + args.epsilon / args. \
-                            num_attack_iter * update_direction / torch.max(torch.abs(update_direction))
+                        max_per_img = torch.max(torch.max(torch.max(torch.abs(update_direction), 1)[0], 1)[0], 1)[0]
+                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:2])
+                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:3])
+                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:4])
+                        imgs.data[j] = imgs.data[j] + epsilon / args. \
+                            num_attack_iter * update_direction / max_per_img
                     else:
                         update_direction = imgs.data[j].grad + args.momentum * last_update_direction[j]
                         last_update_direction[j] = update_direction
-                        imgs.data[j] = imgs.data[j] + args.epsilon / args. \
-                            num_attack_iter * update_direction / torch.max(torch.abs(update_direction))
+                        max_per_img = torch.max(torch.max(torch.max(torch.abs(update_direction), 1)[0], 1)[0], 1)[0]
+                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:2])
+                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:3])
+                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:4])
+                        imgs.data[j] = imgs.data[j] + epsilon / args. \
+                            num_attack_iter * update_direction / max_per_img
                 imgs.data[j] = imgs.data[j].detach()
                 imgs.data[j].requires_grad = True
             model.zero_grad()
@@ -328,12 +341,15 @@ def attack_detector(args, model, cfg, dataset):
             t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
                                                                          imgs.data[j], raw_imgs.data[j],
                                                                          data['img_meta'].data[j],
-                                                                         data['gt_bboxes'].data[0][j],
-                                                                         data['gt_labels'].data[0][j]))
+                                                                         data['gt_bboxes'].data[j],
+                                                                         data['gt_labels'].data[j]))
             t.start()
-            # print('Thread' + str(j) + 'started')
             t.join()
-            statistics += t.get_result()
+            statistics_result = t.get_result()
+            if statistics_result[0] >= 0:
+                statistics += statistics_result
+            else:
+                print("Error! Results were not fetched!")
         pbar_outer.update(1)
     pbar_outer.close()
     pbar_inner.close()
