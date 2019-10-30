@@ -15,6 +15,10 @@ import numpy as np
 from tqdm import trange
 from mmdet.models import build_detector
 from mmdet.datasets import build_dataset
+import xlwt
+import pandas as pd
+import datetime
+import itertools
 
 
 def load_model(args):
@@ -103,8 +107,7 @@ def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bbox
     return np.array([raw_class_acc, raw_iou_acc, class_acc, iou_acc])
 
 
-def attack():
-    args = parse_args()
+def attack(args):
     cfg = Config.fromfile(args.config)
     cfg.data.workers_per_gpu = args.workers_per_gpu
     cfg.data.imgs_per_gpu = args.imgs_per_gpu
@@ -148,10 +151,33 @@ def attack():
         cfg.checkpoint_config.meta = dict(mmdet_version=__version__, config=cfg.text, CLASSES=datasets[0].CLASSES)
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
-    attack_detector(args, model, cfg, datasets[0])
-    return
+    args = attack_detector(args, model, cfg, datasets[0])
+    return args
+
+
+def save_to_excel(dict_list, file_name):
+    data = pd.DataFrame(dict_list)
+    file_path = pd.ExcelWriter(file_name)
+    data.fillna(' ', inplace=True)
+    data.to_excel(file_path, encoding='utf-8', index=False)
+    file_path.save()
 
 
 if __name__ == "__main__":
-    #visualize()
-    attack()
+    result_dict_list = []
+    args_raw = parse_args()
+    remove_keys = ['resume_from', 'launcher', 'local_rank', 'clear_output']
+    search_dict = ['num_attack_iter', 'epsilon', 'momentum']
+    search_values = [[1, 5, 10], [5.0, 10.0, 20.0], [0, 0.5, 1, 2]]
+    args_search = None
+    save_file_name = str(datetime.datetime.now()) + '.xlsx'
+    for search_value in itertools.product(*search_values):
+        args_search = copy.deepcopy(args_raw)
+        for i in range(0, len(search_dict)):
+            exec('args_search.' + search_dict[i] + ' = search_value[i]')
+        args_search = attack(args_search)
+        args_dict = vars(args_search)
+        for key in remove_keys:
+            del args_dict[key]
+        result_dict_list.append(args_dict)
+        save_to_excel(result_dict_list, args_search.work_dir + save_file_name)

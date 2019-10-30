@@ -359,6 +359,14 @@ def attack_detector(args, model, cfg, dataset):
     # print("Accuracy before attack = %g" % acc_before_attack)
     # print("Accuracy under attack = %g" % acc_under_attack)
     # print("Accuracy decrease = %g" % (acc_before_attack - acc_under_attack))
+    args.class_accuracy_before_attack = statistics[0]
+    args.IoU_accuracy_before_attack = statistics[1]
+    args.class_accuracy_under_attack = statistics[2]
+    args.IoU_accuracy_under_attack = statistics[3]
+    args.class_accuracy_decrease = statistics[0] - statistics[2]
+    args.IoU_accuracy_decrease = statistics[1] - statistics[3]
     print("Class & IoU accuracy before attack = %g %g" % (statistics[0], statistics[1]))
     print("Class & IoU accuracy under attack = %g %g" % (statistics[2], statistics[3]))
     print("Class & IoU accuracy decrease = %g %g" % (statistics[0] - statistics[2], statistics[1] - statistics[3]))
+    torch.cuda.empty_cache()
+    return args
