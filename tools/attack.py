@@ -168,7 +168,7 @@ if __name__ == "__main__":
     args_raw = parse_args()
     remove_keys = ['resume_from', 'launcher', 'local_rank', 'clear_output']
     search_dict = ['num_attack_iter', 'epsilon', 'momentum']
-    search_values = [[1, 5, 10], [5.0, 10.0, 20.0], [0, 0.5, 1, 2]]
+    search_values = [[1, 3, 5, 10, 20, 30], [5.0, 10.0, 20.0, 30.0, 40.0], [0, 0.5, 1, 2]]
     args_search = None
     save_file_name = str(datetime.datetime.now()) + '.xlsx'
     for search_value in itertools.product(*search_values):
