@@ -306,31 +306,36 @@ def attack_detector(args, model, cfg, dataset):
             for j in range(0, len(imgs.data)):
                 if args.momentum == 0:
                     update_direction = imgs.data[j].grad
-                    max_per_img = torch.max(torch.max(torch.max(torch.abs(update_direction), 1)[0], 1)[0], 1)[0]
-                    max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:2])
-                    max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:3])
-                    max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:4])
+                    max_per_img = torch.max(torch.abs(update_direction), 1, keepdim=True)[0]
+                    max_per_img = torch.max(max_per_img, 2, keepdim=True)[0]
+                    max_per_img = torch.max(max_per_img, 3, keepdim=True)[0]
+                    max_per_img = max_per_img.expand(update_direction.size())
+                    update_direction = update_direction / max_per_img
                     imgs.data[j] = imgs.data[j] + epsilon / args.\
-                        num_attack_iter * update_direction / max_per_img
+                        num_attack_iter * torch.sign(update_direction)
                 else:
                     if _ == 0:
+                        pdb.set_trace()
                         update_direction = imgs.data[j].grad
+                        max_per_img = torch.max(torch.abs(update_direction), 1, keepdim=True)[0]
+                        max_per_img = torch.max(max_per_img, 2, keepdim=True)[0]
+                        max_per_img = torch.max(max_per_img, 3, keepdim=True)[0]
+                        max_per_img = max_per_img.expand(update_direction.size())
+                        update_direction = update_direction / max_per_img
                         last_update_direction[j] = update_direction
-                        max_per_img = torch.max(torch.max(torch.max(torch.abs(update_direction), 1)[0], 1)[0], 1)[0]
-                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:2])
-                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:3])
-                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:4])
                         imgs.data[j] = imgs.data[j] + epsilon / args. \
-                            num_attack_iter * update_direction / max_per_img
+                            num_attack_iter * torch.sign(update_direction)
                     else:
-                        update_direction = imgs.data[j].grad + args.momentum * last_update_direction[j]
+                        update_direction = imgs.data[j].grad
+                        max_per_img = torch.max(torch.abs(update_direction), 1, keepdim=True)[0]
+                        max_per_img = torch.max(max_per_img, 2, keepdim=True)[0]
+                        max_per_img = torch.max(max_per_img, 3, keepdim=True)[0]
+                        max_per_img = max_per_img.expand(update_direction.size())
+                        update_direction = update_direction / max_per_img
+                        update_direction += args.momentum * last_update_direction[j]
                         last_update_direction[j] = update_direction
-                        max_per_img = torch.max(torch.max(torch.max(torch.abs(update_direction), 1)[0], 1)[0], 1)[0]
-                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:2])
-                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:3])
-                        max_per_img = max_per_img.unsqueeze(-1).expand(update_direction.size()[0:4])
                         imgs.data[j] = imgs.data[j] + epsilon / args. \
-                            num_attack_iter * update_direction / max_per_img
+                            num_attack_iter * torch.sign(update_direction)
                 imgs.data[j] = imgs.data[j].detach()
                 imgs.data[j].requires_grad = True
             model.zero_grad()
