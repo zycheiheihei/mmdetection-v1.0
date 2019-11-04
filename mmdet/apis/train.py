@@ -269,7 +269,6 @@ def attack_detector(args, model, cfg, dataset):
     pbar_inner = tqdm(total=args.num_attack_iter)
     acc_before_attack = 0
     acc_under_attack = 0
-    keys = []
     statistics = np.zeros(4)
     number_of_images = 0
     for i, data in enumerate(attack_loader):
@@ -288,20 +287,15 @@ def attack_detector(args, model, cfg, dataset):
         for _ in range(args.num_attack_iter):
             result = model(imgs, data['img_meta'], return_loss=True,
                            gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
-            if i == 0:
-                keys = list(result.keys())
-                keys.remove('acc')
-                keys.remove('loss_bbox')
             acc_list.append(result['acc'].mean())
             loss = 0
-            for key in keys:
+            for key in args.keys:
                 if type(result[key]) is list:
                     for losses in result[key]:
                         loss += losses.sum()
                 else:
                     loss += result[key].sum()
-            loss.backward(retain_graph=True)
-            result['loss_bbox'].sum().backward()
+            loss.backward()
             last_update_direction = list(range(0, len(imgs.data)))
             for j in range(0, len(imgs.data)):
                 if args.momentum == 0:
@@ -315,7 +309,6 @@ def attack_detector(args, model, cfg, dataset):
                         num_attack_iter * torch.sign(update_direction)
                 else:
                     if _ == 0:
-                        pdb.set_trace()
                         update_direction = imgs.data[j].grad
                         max_per_img = torch.max(torch.abs(update_direction), 1, keepdim=True)[0]
                         max_per_img = torch.max(max_per_img, 2, keepdim=True)[0]

@@ -143,8 +143,8 @@ def attack(args):
         set_random_seed(args.seed)
     model = build_detector(cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
     datasets = [build_dataset(cfg.data.train)]
-    #if len(cfg.workflow) == 2:
-        #datasets.append(build_dataset(cfg.data.val))
+    # if len(cfg.workflow) == 2:
+    # datasets.append(build_dataset(cfg.data.val))
     if cfg.checkpoint_config is not None:
         # save mmdet version, config file content and class names in
         # checkpoints as meta data
@@ -167,8 +167,12 @@ if __name__ == "__main__":
     result_dict_list = []
     args_raw = parse_args()
     remove_keys = ['resume_from', 'launcher', 'local_rank', 'clear_output']
-    search_dict = ['num_attack_iter', 'epsilon', 'momentum']
-    search_values = [[1, 10, 20], [4.0, 8.0, 16.0], [0, 1, 2]]
+    search_dict = ['num_attack_iter', 'epsilon', 'momentum', 'keys']
+    search_values = [[1, 10, 20], [4.0, 8.0, 16.0], [0, 1, 2],
+                     [['loss_rpn_bbox', 'loss_rpn_cls', 'loss_bbox', 'loss_cls'],
+                      ['loss_rpn_bbox', 'loss_cls'],
+                      ['loss_rpn_bbox'],
+                      ['loss_cls']]]
     args_search = None
     save_file_name = str(datetime.datetime.now()) + '.xlsx'
     for search_value in itertools.product(*search_values):
