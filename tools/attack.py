@@ -94,12 +94,18 @@ def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bbox
         raw_filename = metadata[index]['filename']
         (_, filename) = os.path.split(raw_filename)
         filename = filename.split('.', 2)[0]
-        raw_class_acc_image, raw_iou_acc_image = visualize_img_plus_acc(
-            model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index],
-            args.save_path + filename)
-        class_acc_image, iou_acc_image = visualize_img_plus_acc(
-            model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index],
-            args.save_path + filename + '_attack')
+        if torch.rand(1) < args.save_ratio:
+            raw_class_acc_image, raw_iou_acc_image = visualize_img_plus_acc(
+                model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index],
+                args.save_path + filename)
+            class_acc_image, iou_acc_image = visualize_img_plus_acc(
+                model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index],
+                args.save_path + filename + '_attack')
+        else:
+            raw_class_acc_image, raw_iou_acc_image = visualize_img_plus_acc(
+                model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None)
+            class_acc_image, iou_acc_image = visualize_img_plus_acc(
+                model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None)
         raw_class_acc += raw_class_acc_image
         raw_iou_acc += raw_iou_acc_image
         class_acc += class_acc_image

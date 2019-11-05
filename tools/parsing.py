@@ -37,6 +37,7 @@ def parse_args():
     parser.add_argument('--num_attack_iter', type=int, default=5)
     parser.add_argument('--epsilon', type=float, default=5.0)
     parser.add_argument('--momentum', type=float, default=0.0)
+    parser.add_argument('--save_ratio', type=float, default=0.03)
     parser.add_argument('--imgs_per_gpu', type=int, default=4)
     parser.add_argument('--workers_per_gpu', type=int, default=0)
     args = parser.parse_args()

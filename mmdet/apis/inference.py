@@ -207,24 +207,25 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
     labels = np.concatenate(labels)
     gt_bboxes = torch.cat((gt_bboxes, torch.ones(gt_bboxes.size()[0], 1)), 1).numpy()
     gt_labels = gt_labels.numpy() - 1
-    mmcv.imshow_det_bboxes(
-        img.copy(),
-        gt_bboxes,
-        gt_labels,
-        class_names=class_names,
-        score_thr=score_thr,
-        show=show,
-        wait_time=wait_time,
-        out_file=out_file + '_gt.jpg')
-    mmcv.imshow_det_bboxes(
-        img,
-        bboxes,
-        labels,
-        class_names=class_names,
-        score_thr=score_thr,
-        show=show,
-        wait_time=wait_time,
-        out_file=out_file + '.jpg')
+    if out_file:
+        mmcv.imshow_det_bboxes(
+            img.copy(),
+            gt_bboxes,
+            gt_labels,
+            class_names=class_names,
+            score_thr=score_thr,
+            show=show,
+            wait_time=wait_time,
+            out_file=out_file + '_gt.jpg')
+        mmcv.imshow_det_bboxes(
+            img,
+            bboxes,
+            labels,
+            class_names=class_names,
+            score_thr=score_thr,
+            show=show,
+            wait_time=wait_time,
+            out_file=out_file + '.jpg')
     indexes = np.where(bboxes[:, -1] > score_thr)[0]
     bboxes = bboxes[indexes]
     labels = labels[indexes]
@@ -247,10 +248,7 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
     else:
         iou_acc /= class_acc
         class_acc /= len(gt_labels)
-    if not (show or out_file):
-        return img, class_acc, iou_acc
-    else:
-        return class_acc, iou_acc
+    return class_acc, iou_acc
 
 
 def show_result_pyplot(img,
