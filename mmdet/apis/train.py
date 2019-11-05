@@ -289,7 +289,7 @@ def attack_detector(args, model, cfg, dataset):
                            gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
             acc_list.append(result['acc'].mean())
             loss = 0
-            for key in args.keys:
+            for key in args.loss_keys:
                 if type(result[key]) is list:
                     for losses in result[key]:
                         loss += losses.sum()
@@ -354,17 +354,15 @@ def attack_detector(args, model, cfg, dataset):
     acc_before_attack /= max_batch
     acc_under_attack /= max_batch
     statistics /= number_of_images
-    # print("Accuracy before attack = %g" % acc_before_attack)
-    # print("Accuracy under attack = %g" % acc_under_attack)
-    # print("Accuracy decrease = %g" % (acc_before_attack - acc_under_attack))
-    args.class_accuracy_before_attack = statistics[0]
-    args.IoU_accuracy_before_attack = statistics[1]
-    args.class_accuracy_under_attack = statistics[2]
-    args.IoU_accuracy_under_attack = statistics[3]
-    args.class_accuracy_decrease = statistics[0] - statistics[2]
-    args.IoU_accuracy_decrease = statistics[1] - statistics[3]
-    print("Class & IoU accuracy before attack = %g %g" % (statistics[0], statistics[1]))
-    print("Class & IoU accuracy under attack = %g %g" % (statistics[2], statistics[3]))
-    print("Class & IoU accuracy decrease = %g %g" % (statistics[0] - statistics[2], statistics[1] - statistics[3]))
+    args.class_accuracy_before_attack = 100 * statistics[0]
+    args.IoU_accuracy_before_attack = 100 * statistics[1]
+    args.class_accuracy_under_attack = 100 * statistics[2]
+    args.IoU_accuracy_under_attack = 100 * statistics[3]
+    args.class_accuracy_decrease = 100 * (statistics[0] - statistics[2])
+    args.IoU_accuracy_decrease = 100 * (statistics[1] - statistics[3])
+    print("Class & IoU accuracy before attack = %g %g" % (100 * statistics[0], 100 * statistics[1]))
+    print("Class & IoU accuracy under attack = %g %g" % (100 * statistics[2], 100 * statistics[3]))
+    print("Class & IoU accuracy decrease = %g %g" % (100 * statistics[0] - 100 * statistics[2],
+                                                     100 * statistics[1] - 100 * statistics[3]))
     torch.cuda.empty_cache()
     return args

@@ -166,22 +166,31 @@ def save_to_excel(dict_list, file_name):
 if __name__ == "__main__":
     result_dict_list = []
     args_raw = parse_args()
-    remove_keys = ['resume_from', 'launcher', 'local_rank', 'clear_output']
-    search_dict = ['num_attack_iter', 'epsilon', 'momentum', 'keys']
-    search_values = [[1, 10, 20], [4.0, 8.0, 16.0], [0, 1, 2],
+    save_keys = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum'
+                 'class_accuracy_decrease', 'IoU_accuracy_decrease', 'class_accuracy_before_attack',
+                 'class_accuracy_under_attack', 'IoU_accuracy_before_attack', 'IoU_accuracy_under_attack',
+                 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu', 'max_attack_batches', 'seed',
+                 'model_path', 'save_path']
+    search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum']
+    search_values = [[20.0],
                      [['loss_rpn_bbox', 'loss_rpn_cls', 'loss_bbox', 'loss_cls'],
                       ['loss_rpn_bbox', 'loss_cls'],
                       ['loss_rpn_bbox'],
-                      ['loss_cls']]]
+                      ['loss_cls']],
+                     [1, 10, 20],
+                     [0, 1, 2]]
     args_search = None
     save_file_name = str(datetime.datetime.now()) + '.xlsx'
     for search_value in itertools.product(*search_values):
+        if search_dict[2] == 1 and search[3] != search_values[3][0]:
+            continue
+        save_dict = {}
         args_search = copy.deepcopy(args_raw)
         for i in range(0, len(search_dict)):
             exec('args_search.' + search_dict[i] + ' = search_value[i]')
         args_search = attack(args_search)
         args_dict = vars(args_search)
-        for key in remove_keys:
-            del args_dict[key]
-        result_dict_list.append(args_dict)
+        for key in save_keys:
+            save_dict[key] = args_dict[key]
+        result_dict_list.append(save_dict)
         save_to_excel(result_dict_list, args_search.work_dir + save_file_name)
