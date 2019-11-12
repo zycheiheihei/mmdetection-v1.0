@@ -90,27 +90,30 @@ def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bbox
     raw_imgs = raw_imgs.numpy()
     raw_class_acc, raw_iou_acc = 0, 0
     class_acc, iou_acc = 0, 0
+    raw_map_area, map_area = 0, 0
     for index in range(0, np.shape(imgs)[0]):
         raw_filename = metadata[index]['filename']
         (_, filename) = os.path.split(raw_filename)
         filename = filename.split('.', 2)[0]
         if torch.rand(1) < args.save_ratio:
-            raw_class_acc_image, raw_iou_acc_image = visualize_img_plus_acc(
+            raw_class_acc_image, raw_iou_acc_image, raw_map_area_image = visualize_img_plus_acc(
                 model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index],
                 args.save_path + filename)
-            class_acc_image, iou_acc_image = visualize_img_plus_acc(
+            class_acc_image, iou_acc_image, map_area_image = visualize_img_plus_acc(
                 model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index],
                 args.save_path + filename + '_attack')
         else:
-            raw_class_acc_image, raw_iou_acc_image = visualize_img_plus_acc(
+            raw_class_acc_image, raw_iou_acc_image, raw_map_area_image = visualize_img_plus_acc(
                 model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None)
-            class_acc_image, iou_acc_image = visualize_img_plus_acc(
+            class_acc_image, iou_acc_image, map_area_image = visualize_img_plus_acc(
                 model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None)
         raw_class_acc += raw_class_acc_image
         raw_iou_acc += raw_iou_acc_image
+        raw_map_area += raw_map_area_image
         class_acc += class_acc_image
         iou_acc += iou_acc_image
-    return np.array([raw_class_acc, raw_iou_acc, class_acc, iou_acc])
+        map_area += map_area_image
+    return np.array([raw_class_acc, raw_iou_acc, raw_map_area, class_acc, iou_acc, map_area])
 
 
 def attack(args):
@@ -172,11 +175,11 @@ def save_to_excel(dict_list, file_name):
 if __name__ == "__main__":
     result_dict_list = []
     args_raw = parse_args()
-    save_keys = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum'
-                 'class_accuracy_decrease', 'IoU_accuracy_decrease', 'class_accuracy_before_attack',
-                 'class_accuracy_under_attack', 'IoU_accuracy_before_attack', 'IoU_accuracy_under_attack',
-                 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu', 'max_attack_batches', 'seed',
-                 'model_path', 'save_path']
+    save_keys = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'MAP_decrease',
+                 'class_accuracy_decrease', 'IoU_accuracy_decrease', 'MAP_before_attack', 'MAP_under_attack',
+                 'class_accuracy_before_attack', 'class_accuracy_under_attack', 'IoU_accuracy_before_attack',
+                 'IoU_accuracy_under_attack', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
+                 'max_attack_batches', 'seed', 'model_path', 'save_path']
     search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum']
     search_values = [[20.0],
                      [['loss_rpn_bbox', 'loss_rpn_cls', 'loss_bbox', 'loss_cls'],

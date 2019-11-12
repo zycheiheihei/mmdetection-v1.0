@@ -162,6 +162,18 @@ def iou(bbox1, bbox2):
         return area_overlap / (area1 + area2 - area_overlap)
 
 
+def calc_map(map_iou, map_label):
+    map_area = 0
+    positive_iou = np.sort(map_iou(np.where(map_label == 1)))
+    negative_iou = np.sort(map_iou(np.where(map_label == 0)))
+    len_positive = len(positive_iou)
+    # len_negative = len(negative_iou)
+    for i in range(0, len_positive):
+        len_negative_selected = len(np.where(negative_iou >= positive_iou[i]))
+        map_area += (len_positive - i) / (len_negative_selected + len_positive - i)
+    return map_area / len_positive
+
+
 def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
                          score_thr=0.3, wait_time=0, show=True, out_file=None):
     """Visualize the detection results on the image.
@@ -231,6 +243,8 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
     labels = labels[indexes]
     iou_acc = 0
     class_acc = 0
+    map_iou = []
+    map_label = []
     for i in range(0, len(gt_labels)):
         max_iou = 0
         match_index = -1
@@ -240,15 +254,21 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
                 max_iou = temp_iou
                 match_index = j
         if match_index > -1:
+            map_iou.append(max_iou)
             if labels[match_index] == gt_labels[i]:
                 class_acc += 1
                 iou_acc += max_iou
+                map_label.append(1)
+            else:
+                map_label.append(0)
     if class_acc == 0:
         iou_acc = 0
+        map_area = 0
     else:
         iou_acc /= class_acc
         class_acc /= len(gt_labels)
-    return class_acc, iou_acc
+        map_area = calc_map(np.array(map_iou), np.array(map_label))
+    return class_acc, iou_acc, map_area
 
 
 def show_result_pyplot(img,

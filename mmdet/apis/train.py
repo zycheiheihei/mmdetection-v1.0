@@ -356,13 +356,19 @@ def attack_detector(args, model, cfg, dataset):
     statistics /= number_of_images
     args.class_accuracy_before_attack = 100 * statistics[0]
     args.IoU_accuracy_before_attack = 100 * statistics[1]
-    args.class_accuracy_under_attack = 100 * statistics[2]
-    args.IoU_accuracy_under_attack = 100 * statistics[3]
-    args.class_accuracy_decrease = 100 * (statistics[0] - statistics[2])
-    args.IoU_accuracy_decrease = 100 * (statistics[1] - statistics[3])
+    args.MAP_before_attack = statistics[2]
+    args.class_accuracy_under_attack = 100 * statistics[3]
+    args.IoU_accuracy_under_attack = 100 * statistics[4]
+    args.MAP_under_attack = statistics[5]
+    args.class_accuracy_decrease = 100 * (statistics[0] - statistics[3])
+    args.IoU_accuracy_decrease = 100 * (statistics[1] - statistics[4])
+    args.MAP_decrease = 100 * (statistics[2] - statistics[5])
     print("Class & IoU accuracy before attack = %g %g" % (100 * statistics[0], 100 * statistics[1]))
-    print("Class & IoU accuracy under attack = %g %g" % (100 * statistics[2], 100 * statistics[3]))
-    print("Class & IoU accuracy decrease = %g %g" % (100 * statistics[0] - 100 * statistics[2],
-                                                     100 * statistics[1] - 100 * statistics[3]))
+    print("Class & IoU accuracy under attack = %g %g" % (100 * statistics[3], 100 * statistics[4]))
+    print("Class & IoU accuracy decrease = %g %g" % (100 * statistics[0] - 100 * statistics[3],
+                                                     100 * statistics[1] - 100 * statistics[4]))
+    print("MAP before attack = %g" % statistics[2])
+    print("MAP under attack = %g" % statistics[5])
+    print("MAP decrease = %g" % 100 * (statistics[2] - statistics[5]))
     torch.cuda.empty_cache()
     return args
