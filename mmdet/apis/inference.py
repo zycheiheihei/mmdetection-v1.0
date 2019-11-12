@@ -164,12 +164,11 @@ def iou(bbox1, bbox2):
 
 def calc_map(map_iou, map_label):
     map_area = 0
-    positive_iou = np.sort(map_iou(np.where(map_label == 1)))
-    negative_iou = np.sort(map_iou(np.where(map_label == 0)))
+    positive_iou = np.sort(map_iou[np.where(map_label == 1)[0]])
+    negative_iou = np.sort(map_iou[np.where(map_label == 0)[0]])
     len_positive = len(positive_iou)
-    # len_negative = len(negative_iou)
     for i in range(0, len_positive):
-        len_negative_selected = len(np.where(negative_iou >= positive_iou[i]))
+        len_negative_selected = len(np.where(negative_iou >= positive_iou[i])[0])
         map_area += (len_positive - i) / (len_negative_selected + len_positive - i)
     return map_area / len_positive
 

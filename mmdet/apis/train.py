@@ -269,7 +269,7 @@ def attack_detector(args, model, cfg, dataset):
     pbar_inner = tqdm(total=args.num_attack_iter)
     acc_before_attack = 0
     acc_under_attack = 0
-    statistics = np.zeros(4)
+    statistics = np.zeros(6)
     number_of_images = 0
     for i, data in enumerate(attack_loader):
         epsilon = args.epsilon / max(data['img_meta'].data[0][0]['img_norm_cfg']['std'])
@@ -369,6 +369,6 @@ def attack_detector(args, model, cfg, dataset):
                                                      100 * statistics[1] - 100 * statistics[4]))
     print("MAP before attack = %g" % statistics[2])
     print("MAP under attack = %g" % statistics[5])
-    print("MAP decrease = %g" % 100 * (statistics[2] - statistics[5]))
+    print("MAP decrease = %g" % (100 * (statistics[2] - statistics[5])))
     torch.cuda.empty_cache()
     return args
