@@ -181,7 +181,7 @@ if __name__ == "__main__":
                  'IoU_accuracy_under_attack', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
                  'max_attack_batches', 'seed', 'model_path', 'save_path']
     search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum']
-    search_values = [[20.0],
+    search_values = [[4.0, 8.0, 16.0],
                      [['loss_rpn_bbox', 'loss_rpn_cls', 'loss_bbox', 'loss_cls'],
                       ['loss_rpn_bbox', 'loss_cls'],
                       ['loss_rpn_bbox'],

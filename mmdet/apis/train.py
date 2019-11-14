@@ -284,6 +284,7 @@ def attack_detector(args, model, cfg, dataset):
             number_of_images += imgs.data[j].size()[0]
         pbar_inner.reset()
         acc_list = []
+        last_update_direction = list(range(0, len(imgs.data)))
         for _ in range(args.num_attack_iter):
             result = model(imgs, data['img_meta'], return_loss=True,
                            gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
@@ -296,7 +297,6 @@ def attack_detector(args, model, cfg, dataset):
                 else:
                     loss += result[key].sum()
             loss.backward()
-            last_update_direction = list(range(0, len(imgs.data)))
             for j in range(0, len(imgs.data)):
                 if args.momentum == 0:
                     update_direction = imgs.data[j].grad
