@@ -22,6 +22,7 @@ from skimage import transform
 import copy
 import threading
 from datetime import datetime
+import scipy.stats as st
 
 
 class ThreadingWithResult(threading.Thread):
@@ -252,6 +253,21 @@ def _non_dist_train(model, dataset, cfg, validate=False):
     runner.run(data_loaders, cfg.workflow, cfg.total_epochs)
 
 
+def conv_layer(args):
+    x = np.linspace(-3, 3, args.kernel_size)
+    kern1d = st.norm.pdf(x)
+    kernel_raw = np.outer(kern1d, kern1d)
+    kernel = kernel_raw / kernel_raw.sum()
+    kernel = kernel.astype(np.float32)
+    weight = np.stack([kernel, kernel, kernel])
+    weight = torch.Tensor(weight).unsqueeze(0).cuda()
+    assert (args.kernel_size - 1) % 2 == 0
+
+    def conv(input_data):
+        return torch.nn.functional.conv2d(input_data, weight, bias=None, stride=1, padding=(args.kernel_size - 1) // 2)
+    return conv
+
+
 def attack_detector(args, model, cfg, dataset):
     print(str(datetime.now()) + ' - INFO - GPUs: ', cfg.gpus)
     print(str(datetime.now()) + ' - INFO - Imgs per GPU: ', cfg.data.imgs_per_gpu)
@@ -271,6 +287,9 @@ def attack_detector(args, model, cfg, dataset):
     acc_under_attack = 0
     statistics = np.zeros(6)
     number_of_images = 0
+    conv_kernel = None
+    if args.kernel_size != 0:
+        conv_kernel = conv_layer(args)
     for i, data in enumerate(attack_loader):
         epsilon = args.epsilon / max(data['img_meta'].data[0][0]['img_norm_cfg']['std'])
         if i >= max_batch:
@@ -300,6 +319,8 @@ def attack_detector(args, model, cfg, dataset):
             for j in range(0, len(imgs.data)):
                 if args.momentum == 0:
                     update_direction = imgs.data[j].grad
+                    if conv_kernel:
+                        update_direction = conv_kernel(update_direction)
                     max_per_img = torch.max(torch.abs(update_direction), 1, keepdim=True)[0]
                     max_per_img = torch.max(max_per_img, 2, keepdim=True)[0]
                     max_per_img = torch.max(max_per_img, 3, keepdim=True)[0]
@@ -310,6 +331,8 @@ def attack_detector(args, model, cfg, dataset):
                 else:
                     if _ == 0:
                         update_direction = imgs.data[j].grad
+                        if conv_kernel:
+                            update_direction = conv_kernel(update_direction)
                         max_per_img = torch.max(torch.abs(update_direction), 1, keepdim=True)[0]
                         max_per_img = torch.max(max_per_img, 2, keepdim=True)[0]
                         max_per_img = torch.max(max_per_img, 3, keepdim=True)[0]
@@ -320,6 +343,8 @@ def attack_detector(args, model, cfg, dataset):
                             num_attack_iter * torch.sign(update_direction)
                     else:
                         update_direction = imgs.data[j].grad
+                        if conv_kernel:
+                            update_direction = conv_kernel(update_direction)
                         max_per_img = torch.max(torch.abs(update_direction), 1, keepdim=True)[0]
                         max_per_img = torch.max(max_per_img, 2, keepdim=True)[0]
                         max_per_img = torch.max(max_per_img, 3, keepdim=True)[0]

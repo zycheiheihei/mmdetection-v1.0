@@ -40,6 +40,8 @@ def parse_args():
     parser.add_argument('--save_ratio', type=float, default=0.03)
     parser.add_argument('--imgs_per_gpu', type=int, default=4)
     parser.add_argument('--workers_per_gpu', type=int, default=0)
+    parser.add_argument('--kernel', type=str, default="Gaussian")
+    parser.add_argument('--kernel_size', type=int, default=0)
     args = parser.parse_args()
     args.config += args.model_name + '.py'
     if 'LOCAL_RANK' not in os.environ:
