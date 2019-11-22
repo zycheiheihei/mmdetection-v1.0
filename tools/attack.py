@@ -186,8 +186,8 @@ if __name__ == "__main__":
                       ['loss_rpn_bbox', 'loss_cls'],
                       ['loss_rpn_bbox'],
                       ['loss_cls']],
-                     [1, 10, 20],
-                     [0, 1, 2]]
+                     [1, 5, 10, 20],
+                     [0, 0.5, 1, 1.5, 2]]
     args_search = None
     save_file_name = str(datetime.datetime.now()) + '.xlsx'
     for search_value in itertools.product(*search_values):
