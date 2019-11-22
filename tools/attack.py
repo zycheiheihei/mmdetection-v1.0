@@ -175,19 +175,20 @@ def save_to_excel(dict_list, file_name):
 if __name__ == "__main__":
     result_dict_list = []
     args_raw = parse_args()
-    save_keys = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'MAP_decrease',
+    save_keys = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel_size', 'MAP_decrease',
                  'class_accuracy_decrease', 'IoU_accuracy_decrease', 'MAP_before_attack', 'MAP_under_attack',
                  'class_accuracy_before_attack', 'class_accuracy_under_attack', 'IoU_accuracy_before_attack',
                  'IoU_accuracy_under_attack', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
                  'max_attack_batches', 'seed', 'model_path', 'save_path']
-    search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum']
+    search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel_size']
     search_values = [[4.0, 8.0, 16.0],
                      [['loss_rpn_bbox', 'loss_rpn_cls', 'loss_bbox', 'loss_cls'],
                       ['loss_rpn_bbox', 'loss_cls'],
                       ['loss_rpn_bbox'],
                       ['loss_cls']],
                      [1, 5, 10, 20],
-                     [0, 0.5, 1, 1.5, 2]]
+                     [0, 0.5, 1, 1.5, 2],
+                     [11, 21, 41]]
     args_search = None
     save_file_name = str(datetime.datetime.now()) + '.xlsx'
     for search_value in itertools.product(*search_values):
