@@ -41,9 +41,9 @@ def visualize():
     save_path = '/home/fengyao/MSCOCO2017dataset/test/test2017/output/'
     imgs = ['000000000001.jpg',
             '000000000016.jpg']
-    for i in range(0, len(imgs)):
-        result = inference_detector(model, root + imgs[i])
-        show_result(root + imgs[i], result, model.CLASSES, show=False, out_file=save_path + imgs[i])
+    for index in range(0, len(imgs)):
+        result = inference_detector(model, root + imgs[index])
+        show_result(root + imgs[index], result, model.CLASSES, show=False, out_file=save_path + imgs[index])
     print('[INFO]Done.')
 
 
@@ -75,17 +75,16 @@ def visualize_all_images(args, model, imgs, raw_imgs, metadata):
 
 
 def visualize_img_plus_acc(model, img, metadata, gt_bboxes, gt_labels, save_path):
-    img = img.transpose(1, 2, 0)
-    img = img[:, :, [2, 1, 0]]
-    img_mean = metadata['img_norm_cfg']['mean']
-    img_std = metadata['img_norm_cfg']['std']
-    for k in range(0, 3):
-        img[:, :, k] = img[:, :, k] * img_std[2 - k] + img_mean[2 - k]
+    img_mean = metadata['img_norm_cfg']['mean'][::-1]
+    img_std = metadata['img_norm_cfg']['std'][::-1]
+    img = img * img_std + img_mean
     result = inference_detector(model, img)
     return show_result_plus_acc(img, result, model.CLASSES, gt_bboxes, gt_labels, show=False, out_file=save_path)
 
 
 def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bboxes, gt_labels):
+    imgs = imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
+    raw_imgs = raw_imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
     imgs = imgs.detach().cpu().numpy()
     raw_imgs = raw_imgs.numpy()
     raw_class_acc, raw_iou_acc = 0, 0
@@ -116,7 +115,7 @@ def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bbox
     return np.array([raw_class_acc, raw_iou_acc, raw_map_area, class_acc, iou_acc, map_area])
 
 
-def attack(args):
+def attack(args, datasets):
     cfg = Config.fromfile(args.config)
     cfg.data.workers_per_gpu = args.workers_per_gpu
     cfg.data.imgs_per_gpu = args.imgs_per_gpu
@@ -151,7 +150,8 @@ def attack(args):
         logger.info('Set random seed to {}'.format(args.seed))
         set_random_seed(args.seed)
     model = build_detector(cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
-    datasets = [build_dataset(cfg.data.train)]
+    if datasets is None:
+        datasets = [build_dataset(cfg.data.train)]
     # if len(cfg.workflow) == 2:
     # datasets.append(build_dataset(cfg.data.val))
     if cfg.checkpoint_config is not None:
@@ -161,7 +161,7 @@ def attack(args):
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
     args = attack_detector(args, model, cfg, datasets[0])
-    return args
+    return args, datasets
 
 
 def save_to_excel(dict_list, file_name):
@@ -181,16 +181,17 @@ if __name__ == "__main__":
                  'IoU_accuracy_under_attack', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
                  'max_attack_batches', 'seed', 'model_path', 'save_path']
     search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel_size']
-    search_values = [[4.0, 8.0, 16.0],
+    search_values = [[4.0],
                      [['loss_rpn_bbox', 'loss_rpn_cls', 'loss_bbox', 'loss_cls'],
                       ['loss_rpn_bbox', 'loss_cls'],
                       ['loss_rpn_bbox'],
                       ['loss_cls']],
-                     [1, 5, 10, 20],
-                     [0, 0.5, 1, 1.5, 2],
-                     [0, 11, 21, 41]]
+                     [1, 10, 20],
+                     [0, 1, 2],
+                     [0, 5, 11]]
     args_search = None
     save_file_name = str(datetime.datetime.now()) + '.xlsx'
+    loaded_datasets = None
     for search_value in itertools.product(*search_values):
         if search_dict[2] == 1 and search[3] != search_values[3][0]:
             continue
@@ -198,7 +199,7 @@ if __name__ == "__main__":
         args_search = copy.deepcopy(args_raw)
         for i in range(0, len(search_dict)):
             exec('args_search.' + search_dict[i] + ' = search_value[i]')
-        args_search = attack(args_search)
+        args_search, loaded_datasets = attack(args_search, loaded_datasets)
         args_dict = vars(args_search)
         for key in save_keys:
             save_dict[key] = args_dict[key]

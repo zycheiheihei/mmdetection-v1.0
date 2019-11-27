@@ -288,6 +288,7 @@ def attack_detector(args, model, cfg, dataset):
     statistics = np.zeros(6)
     number_of_images = 0
     conv_kernel = None
+    with_mask = hasattr(model.module, 'mask_head') and model.module.mask_head is not None
     if args.kernel_size != 0:
         conv_kernel = conv_layer(args)
     for i, data in enumerate(attack_loader):
@@ -305,8 +306,12 @@ def attack_detector(args, model, cfg, dataset):
         acc_list = []
         last_update_direction = list(range(0, len(imgs.data)))
         for _ in range(args.num_attack_iter):
-            result = model(imgs, data['img_meta'], return_loss=True,
-                           gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
+            if with_mask:
+                result = model(imgs, data['img_meta'], return_loss=True, gt_bboxes=data['gt_bboxes'],
+                               gt_labels=data['gt_labels'], gt_masks=data['gt_masks'])
+            else:
+                result = model(imgs, data['img_meta'], return_loss=True,
+                               gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
             acc_list.append(result['acc'].mean())
             loss = 0
             for key in args.loss_keys:

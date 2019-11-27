@@ -158,8 +158,25 @@ def iou(bbox1, bbox2):
         area1 = (bbox1[2] - bbox1[0]) * (bbox1[3] - bbox1[1])
         area2 = (bbox2[2] - bbox2[0]) * (bbox2[3] - bbox2[1])
         area_overlap = (overlap_right - overlap_left) * (overlap_top - overlap_bottom)
-        assert area_overlap > 0
         return area_overlap / (area1 + area2 - area_overlap)
+
+
+def iou_vector(bbox1, bbox2):
+    select_indexes = np.where((bbox1[:, 0] < bbox2[2]) & (bbox1[:, 2] > bbox2[0]) &
+                              (bbox1[:, 1] < bbox2[3]) & (bbox1[:, 3] > bbox2[1]))[0]
+    if len(select_indexes) == 0:
+        return -1, 0
+    bbox1_selected = bbox1[select_indexes, :]
+    area1 = (bbox1_selected[:, 2] - bbox1_selected[:, 0]) * (bbox1_selected[:, 3] - bbox1_selected[:, 1])
+    area2 = (bbox2[2] - bbox2[0]) * (bbox2[3] - bbox2[1])
+    overlap_left = np.maximum(bbox1_selected[:, 0], bbox2[0])
+    overlap_right = np.minimum(bbox1_selected[:, 2], bbox2[2])
+    overlap_bottom = np.maximum(bbox1_selected[:, 1], bbox2[1])
+    overlap_top = np.minimum(bbox1_selected[:, 3], bbox2[3])
+    area_overlap = (overlap_right - overlap_left) * (overlap_top - overlap_bottom)
+    max_index = select_indexes[np.argmax(area_overlap / (area1 + area2 - area_overlap))]
+    max_value = np.max(area_overlap / (area1 + area2 - area_overlap))
+    return max_index, max_value
 
 
 def calc_map(map_iou, map_label):
@@ -245,13 +262,14 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
     map_iou = []
     map_label = []
     for i in range(0, len(gt_labels)):
-        max_iou = 0
-        match_index = -1
-        for j in range(0, len(indexes)):
-            temp_iou = iou(bboxes[j], gt_bboxes[i])
-            if temp_iou > max_iou:
-                max_iou = temp_iou
-                match_index = j
+        # max_iou = 0
+        # match_index = -1
+        # for j in range(0, len(indexes)):
+            # temp_iou = iou(bboxes[j], gt_bboxes[i])
+            # if temp_iou > max_iou:
+                # max_iou = temp_iou
+                # match_index = j
+        match_index, max_iou = iou_vector(bboxes, gt_bboxes[i])
         if match_index > -1:
             map_iou.append(max_iou)
             if labels[match_index] == gt_labels[i]:
