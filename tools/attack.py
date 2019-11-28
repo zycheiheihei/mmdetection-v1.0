@@ -102,8 +102,13 @@ def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bbox
                 model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index],
                 args.save_path + filename + '_attack')
         else:
-            raw_class_acc_image, raw_iou_acc_image, raw_map_area_image = visualize_img_plus_acc(
-                model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None)
+            if args.neglect_raw_stat and args.experiment_index > 0:
+                raw_class_acc_image = 0
+                raw_iou_acc_image = 0
+                raw_map_area_image = 0
+            else:
+                raw_class_acc_image, raw_iou_acc_image, raw_map_area_image = visualize_img_plus_acc(
+                    model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None)
             class_acc_image, iou_acc_image, map_area_image = visualize_img_plus_acc(
                 model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None)
         raw_class_acc += raw_class_acc_image
@@ -189,19 +194,26 @@ if __name__ == "__main__":
                      [1, 10, 20],
                      [0, 1, 2],
                      [0, 5, 11, 15]]
-    args_search = None
+    args_raw.MAP_before_attack = None
+    args_search = copy.deepcopy(args_raw)
     save_file_name = str(datetime.datetime.now()) + '.xlsx'
     loaded_datasets = None
+    experiment_index = 0
     for search_value in itertools.product(*search_values):
         if search_dict[2] == 1 and search[3] != search_values[3][0]:
             continue
         save_dict = {}
-        args_search = copy.deepcopy(args_raw)
+        if args_raw.neglect_raw_stat:
+            args_search = copy.deepcopy(args_search)
+        else:
+            args_search = copy.deepcopy(args_raw)
         for i in range(0, len(search_dict)):
             exec('args_search.' + search_dict[i] + ' = search_value[i]')
+        args_search.experiment_index = experiment_index
         args_search, loaded_datasets = attack(args_search, loaded_datasets)
         args_dict = vars(args_search)
         for key in save_keys:
             save_dict[key] = args_dict[key]
         result_dict_list.append(save_dict)
         save_to_excel(result_dict_list, args_search.work_dir + save_file_name)
+        experiment_index = experiment_index + 1

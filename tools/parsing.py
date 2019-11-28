@@ -33,6 +33,8 @@ def parse_args():
     parser.add_argument('--model_name', help='name of loaded model', default='mask_rcnn_r50_fpn_1x')
     parser.add_argument('--train', action='store_true', help='whether or not to train')
     parser.add_argument('--clear_output', action='store_true', help='whether or not to clear output path')
+    parser.add_argument('--neglect_raw_stat', action='store_true', help='whether or not to neglect stat '
+                                                                        'calculation of raw data')
     parser.add_argument('--model_path', type=str, default=None)
     parser.add_argument('--num_attack_iter', type=int, default=5)
     parser.add_argument('--epsilon', type=float, default=5.0)
