@@ -259,7 +259,7 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
         indexes = np.where(bboxes[:, -1] > score_thr)[0]
         bboxes = bboxes[indexes]
         map_iou = []
-        for i in range(0, len(gt_labels)):
+        for i in range(0, len(gt_bboxes)):
             match_index, max_iou = iou_vector(bboxes, gt_bboxes[i])
             if match_index > -1:
                 map_iou.append(max_iou)
