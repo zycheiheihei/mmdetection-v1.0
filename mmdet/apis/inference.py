@@ -235,8 +235,9 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
     labels = np.concatenate(labels)
     gt_bboxes = torch.cat((gt_bboxes, torch.ones(gt_bboxes.size()[0], 1)), 1).numpy()
     if type(gt_labels) is int:
-        gt_labels = np.array([0] * len(gt_bboxes))
         if out_file:
+            gt_labels = np.array([0] * len(gt_bboxes))
+            labels = np.array([0] * len(bboxes))
             mmcv.imshow_det_bboxes(
                 img.copy(),
                 gt_bboxes,
