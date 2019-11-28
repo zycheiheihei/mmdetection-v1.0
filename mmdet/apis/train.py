@@ -303,16 +303,16 @@ def attack_detector(args, model, cfg, dataset):
             imgs.data[j].requires_grad = True
             number_of_images += imgs.data[j].size()[0]
         pbar_inner.reset()
-        acc_list = []
         last_update_direction = list(range(0, len(imgs.data)))
         for _ in range(args.num_attack_iter):
-            if with_mask:
+            if args.model_name == 'rpn_r50_fpn_1x':
+                result = model(imgs, data['img_meta'], return_loss=True, gt_bboxes=data['gt_bboxes'])
+            elif with_mask:
                 result = model(imgs, data['img_meta'], return_loss=True, gt_bboxes=data['gt_bboxes'],
                                gt_labels=data['gt_labels'], gt_masks=data['gt_masks'])
             else:
                 result = model(imgs, data['img_meta'], return_loss=True,
                                gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
-            acc_list.append(result['acc'].mean())
             loss = 0
             for key in args.loss_keys:
                 if type(result[key]) is list:
@@ -363,14 +363,18 @@ def attack_detector(args, model, cfg, dataset):
                 imgs.data[j].requires_grad = True
             model.zero_grad()
             pbar_inner.update(1)
-        acc_before_attack += acc_list[0]
-        acc_under_attack += acc_list[-1]
         for j in range(0, cfg.gpus):
-            t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
-                                                                         imgs.data[j], raw_imgs.data[j],
-                                                                         data['img_meta'].data[j],
-                                                                         data['gt_bboxes'].data[j],
-                                                                         data['gt_labels'].data[j]))
+            if args.model_name == 'rpn_r50_fpn_1x':
+                t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
+                                                                             imgs.data[j], raw_imgs.data[j],
+                                                                             data['img_meta'].data[j],
+                                                                             data['gt_bboxes'].data[j]))
+            else:
+                t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
+                                                                             imgs.data[j], raw_imgs.data[j],
+                                                                             data['img_meta'].data[j],
+                                                                             data['gt_bboxes'].data[j],
+                                                                             data['gt_labels'].data[j]))
             t.start()
             t.join()
             statistics_result = t.get_result()

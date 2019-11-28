@@ -82,7 +82,7 @@ def visualize_img_plus_acc(model, img, metadata, gt_bboxes, gt_labels, save_path
     return show_result_plus_acc(img, result, model.CLASSES, gt_bboxes, gt_labels, show=False, out_file=save_path)
 
 
-def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bboxes, gt_labels):
+def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bboxes, gt_labels=None):
     imgs = imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
     raw_imgs = raw_imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
     imgs = imgs.detach().cpu().numpy()
@@ -90,6 +90,8 @@ def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bbox
     raw_class_acc, raw_iou_acc = 0, 0
     class_acc, iou_acc = 0, 0
     raw_map_area, map_area = 0, 0
+    if gt_labels is None:
+        gt_labels = [-1] * np.shape(imgs)[0]
     for index in range(0, np.shape(imgs)[0]):
         raw_filename = metadata[index]['filename']
         (_, filename) = os.path.split(raw_filename)
@@ -194,6 +196,14 @@ if __name__ == "__main__":
                      [1, 10, 20],
                      [0, 1, 2],
                      [0, 5, 11, 15]]
+    if args_raw.model_name == 'rpn_r50_fpn_1x':
+        search_values = [[16.0],
+                         [['loss_rpn_bbox', 'loss_rpn_cls'],
+                          ['loss_rpn_bbox'],
+                          ['loss_rpn_cls']],
+                         [1, 10, 20],
+                         [0, 1, 2],
+                         [0, 5, 11, 15]]
     args_raw.MAP_before_attack = None
     args_search = copy.deepcopy(args_raw)
     save_file_name = str(datetime.datetime.now()) + '.xlsx'

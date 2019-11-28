@@ -234,7 +234,39 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
     ]
     labels = np.concatenate(labels)
     gt_bboxes = torch.cat((gt_bboxes, torch.ones(gt_bboxes.size()[0], 1)), 1).numpy()
-    gt_labels = gt_labels.numpy() - 1
+    if type(gt_labels) is int:
+        gt_labels = [0] * len(gt_bboxes)
+        if out_file:
+            mmcv.imshow_det_bboxes(
+                img.copy(),
+                gt_bboxes,
+                gt_labels,
+                class_names=class_names,
+                score_thr=score_thr,
+                show=show,
+                wait_time=wait_time,
+                out_file=out_file + '_gt.jpg')
+            mmcv.imshow_det_bboxes(
+                img,
+                bboxes,
+                labels,
+                class_names=class_names,
+                score_thr=score_thr,
+                show=show,
+                wait_time=wait_time,
+                out_file=out_file + '.jpg')
+        indexes = np.where(bboxes[:, -1] > score_thr)[0]
+        bboxes = bboxes[indexes]
+        map_iou = []
+        for i in range(0, len(gt_labels)):
+            match_index, max_iou = iou_vector(bboxes, gt_bboxes[i])
+            if match_index > -1:
+                map_iou.append(max_iou)
+            else:
+                map_iou.append(0)
+        return 0, float(sum(map_iou)) / len(map_iou), 0
+    else:
+        gt_labels = gt_labels.numpy() - 1
     if out_file:
         mmcv.imshow_det_bboxes(
             img.copy(),
@@ -262,13 +294,6 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
     map_iou = []
     map_label = []
     for i in range(0, len(gt_labels)):
-        # max_iou = 0
-        # match_index = -1
-        # for j in range(0, len(indexes)):
-            # temp_iou = iou(bboxes[j], gt_bboxes[i])
-            # if temp_iou > max_iou:
-                # max_iou = temp_iou
-                # match_index = j
         match_index, max_iou = iou_vector(bboxes, gt_bboxes[i])
         if match_index > -1:
             map_iou.append(max_iou)
