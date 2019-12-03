@@ -254,14 +254,30 @@ def _non_dist_train(model, dataset, cfg, validate=False):
 
 
 def conv_layer(args):
-    x = np.linspace(-3, 3, args.kernel_size)
-    kern1d = st.norm.pdf(x)
-    kernel_raw = np.outer(kern1d, kern1d)
-    kernel = kernel_raw / kernel_raw.sum()
-    kernel = kernel.astype(np.float32)
-    weight = np.stack([kernel, kernel, kernel])
-    weight = torch.Tensor(weight).unsqueeze(0).cuda()
     assert (args.kernel_size - 1) % 2 == 0
+    if args.kernel == 'Gaussian':
+        x = np.linspace(-3, 3, args.kernel_size)
+        kern1d = st.norm.pdf(x)
+        kernel_raw = np.outer(kern1d, kern1d)
+        kernel = kernel_raw / kernel_raw.sum()
+        kernel = kernel.astype(np.float32)
+        weight = np.stack([kernel, kernel, kernel])
+        weight = torch.Tensor(weight).unsqueeze(0).cuda()
+    elif args.kernel == 'Linear':
+        x = np.linspace(0, 1, (args.kernel_size + 1) // 2)
+        kern1d = np.concatenate((x, x[np.size(x) - 2::-1]))
+        kernel_raw = np.outer(kern1d, kern1d)
+        kernel = kernel_raw / kernel_raw.sum()
+        kernel = kernel.astype(np.float32)
+        weight = np.stack([kernel, kernel, kernel])
+        weight = torch.Tensor(weight).unsqueeze(0).cuda()
+    elif args.kernel == 'Uniform':
+        kern1d = np.ones(args.kernel_size)
+        kernel_raw = np.outer(kern1d, kern1d)
+        kernel = kernel_raw / kernel_raw.sum()
+        kernel = kernel.astype(np.float32)
+        weight = np.stack([kernel, kernel, kernel])
+        weight = torch.Tensor(weight).unsqueeze(0).cuda()
 
     def conv(input_data):
         return torch.nn.functional.conv2d(input_data, weight, bias=None, stride=1, padding=(args.kernel_size - 1) // 2)

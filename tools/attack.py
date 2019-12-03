@@ -187,7 +187,7 @@ if __name__ == "__main__":
                  'class_accuracy_before_attack', 'class_accuracy_under_attack', 'IoU_accuracy_before_attack',
                  'IoU_accuracy_under_attack', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
                  'max_attack_batches', 'seed', 'model_path', 'save_path']
-    search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel_size']
+    search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel', 'kernel_size']
     search_values = [[16.0],
                      [['loss_rpn_bbox', 'loss_rpn_cls', 'loss_bbox', 'loss_cls'],
                       ['loss_rpn_bbox', 'loss_cls'],
@@ -195,6 +195,7 @@ if __name__ == "__main__":
                       ['loss_cls']],
                      [1, 10, 20],
                      [0, 1, 2],
+                     ['Uniform', 'Linear', 'Gaussian'],
                      [0, 5, 11, 15]]
     if args_raw.model_name == 'rpn_r50_fpn_1x':
         search_values = [[16.0],
@@ -203,6 +204,7 @@ if __name__ == "__main__":
                           ['loss_rpn_cls']],
                          [1, 10, 20],
                          [0, 1, 2],
+                         ['Uniform', 'Linear', 'Gaussian'],
                          [0, 5, 11, 15]]
     args_raw.MAP_before_attack = None
     args_search = copy.deepcopy(args_raw)
