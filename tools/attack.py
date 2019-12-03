@@ -182,7 +182,7 @@ def save_to_excel(dict_list, file_name):
 if __name__ == "__main__":
     result_dict_list = []
     args_raw = parse_args()
-    save_keys = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel_size', 'MAP_decrease',
+    save_keys = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel', 'kernel_size', 'MAP_decrease',
                  'class_accuracy_decrease', 'IoU_accuracy_decrease', 'MAP_before_attack', 'MAP_under_attack',
                  'class_accuracy_before_attack', 'class_accuracy_under_attack', 'IoU_accuracy_before_attack',
                  'IoU_accuracy_under_attack', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
