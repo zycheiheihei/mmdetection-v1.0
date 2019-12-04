@@ -212,8 +212,6 @@ if __name__ == "__main__":
     loaded_datasets = None
     experiment_index = 0
     for search_value in itertools.product(*search_values):
-        if search_dict[2] == 1 and search[3] != search_values[3][0]:
-            continue
         save_dict = {}
         if args_raw.neglect_raw_stat:
             args_search = copy.deepcopy(args_search)
@@ -221,6 +219,8 @@ if __name__ == "__main__":
             args_search = copy.deepcopy(args_raw)
         for i in range(0, len(search_dict)):
             exec('args_search.' + search_dict[i] + ' = search_value[i]')
+        if args_search.num_attack_iter == 1 and args_search.momentum > 0:
+            continue
         args_search.experiment_index = experiment_index
         args_search, loaded_datasets = attack(args_search, loaded_datasets)
         args_dict = vars(args_search)
