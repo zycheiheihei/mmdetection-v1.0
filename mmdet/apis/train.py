@@ -425,5 +425,5 @@ def attack_detector(args, model, cfg, dataset):
     print("MAP before attack = %g" % args.MAP_before_attack)
     print("MAP under attack = %g" % args.MAP_under_attack)
     print("MAP decrease = %g" % args.MAP_decrease)
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
     return args
