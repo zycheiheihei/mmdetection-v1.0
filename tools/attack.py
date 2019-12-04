@@ -221,7 +221,7 @@ if __name__ == "__main__":
             exec('args_search.' + search_dict[i] + ' = search_value[i]')
         if args_search.num_attack_iter == 1 and args_search.momentum > 0:
             continue
-        if experiment_index < args_raw.resume_from:
+        if experiment_index < args_raw.resume_experiment:
             experiment_index = experiment_index + 1
             continue
         args_search.experiment_index = experiment_index
