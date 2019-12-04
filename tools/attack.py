@@ -104,7 +104,7 @@ def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bbox
                 model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index],
                 args.save_path + filename + '_attack')
         else:
-            if args.neglect_raw_stat and args.experiment_index > 0:
+            if args.neglect_raw_stat and args.experiment_index > args.resume_experiment:
                 raw_class_acc_image = 0
                 raw_iou_acc_image = 0
                 raw_map_area_image = 0

@@ -404,7 +404,7 @@ def attack_detector(args, model, cfg, dataset):
     acc_before_attack /= max_batch
     acc_under_attack /= max_batch
     statistics /= number_of_images
-    if args.neglect_raw_stat and args.experiment_index > 0:
+    if args.neglect_raw_stat and args.experiment_index > args.resume_experiment:
         pass
     else:
         args.class_accuracy_before_attack = 100 * statistics[0]
