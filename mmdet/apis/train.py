@@ -386,7 +386,6 @@ def attack_detector(args, model, cfg, dataset):
             for t in thread_list:
                 t.join()
                 statistics_result = t.get_result()
-                pdb.set_trace()
                 if statistics_result[0] >= 0:
                     statistics += statistics_result
                 else:
