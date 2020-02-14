@@ -305,20 +305,12 @@ def attack_detector(args, model, cfg, dataset):
     statistics = np.zeros(6)
     number_of_images = 0
     conv_kernel = None
-    thread_list = None
     with_mask = hasattr(model.module, 'mask_head') and model.module.mask_head is not None
     if args.kernel_size != 0:
         conv_kernel = conv_layer(args)
     for i, data in enumerate(attack_loader):
         epsilon = args.epsilon / max(data['img_meta'].data[0][0]['img_norm_cfg']['std'])
         if i >= max_batch:
-            for t in thread_list:
-                t.join()
-                statistics_result = t.get_result()
-                if statistics_result[0] >= 0:
-                    statistics += statistics_result
-                else:
-                    print("Error! Results were not fetched!")
             break
         raw_imgs = copy.deepcopy(data['img'])
         imgs = data['img']
@@ -382,15 +374,6 @@ def attack_detector(args, model, cfg, dataset):
                 imgs.data[j].requires_grad = True
             model.zero_grad()
             pbar_inner.update(1)
-        if thread_list is not None:
-            for t in thread_list:
-                t.join()
-                statistics_result = t.get_result()
-                if statistics_result[0] >= 0:
-                    statistics += statistics_result
-                else:
-                    print("Error! Results were not fetched!")
-        thread_list = []
         for j in range(0, cfg.gpus):
             if args.model_name == 'rpn_r50_fpn_1x':
                 t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
@@ -404,7 +387,12 @@ def attack_detector(args, model, cfg, dataset):
                                                                              data['gt_bboxes'].data[j],
                                                                              data['gt_labels'].data[j]))
             t.start()
-            thread_list.append(t)
+            t.join()
+            statistics_result = t.get_result()
+            if statistics_result[0] >= 0:
+                statistics += statistics_result
+            else:
+                print("Error! Results were not fetched!")
         pbar_outer.update(1)
     pbar_outer.close()
     pbar_inner.close()
