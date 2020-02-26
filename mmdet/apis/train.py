@@ -13,7 +13,7 @@ from mmdet.datasets import DATASETS, build_dataloader
 from mmdet.models import RPN
 from .env import get_root_logger
 import pdb
-from tools.attack import load_model, visualize_all_images, visualize_all_images_plus_acc
+from tools.attack import load_model, visualize_all_images, visualize_all_images_plus_acc, visualize_modification
 import datetime
 import numpy as np
 from tqdm import tqdm
@@ -23,6 +23,7 @@ import copy
 import threading
 from datetime import datetime
 import scipy.stats as st
+import shutil
 
 
 class ThreadingWithResult(threading.Thread):
@@ -295,7 +296,10 @@ def attack_detector(args, model, cfg, dataset):
     if args.clear_output:
         file_list = os.listdir(args.save_path)
         for f in file_list:
-            os.remove(os.path.join(args.save_path, f))
+            if os.path.isdir(os.path.join(args.save_path, f)):
+                shutil.rmtree(os.path.join(args.save_path, f))
+            else:
+                os.remove(os.path.join(args.save_path, f))
     max_batch = min(attack_loader.__len__(), args.max_attack_batches)
     pbar_outer = tqdm(total=max_batch)
     pbar_inner = tqdm(total=args.num_attack_iter)
@@ -304,6 +308,7 @@ def attack_detector(args, model, cfg, dataset):
     acc_under_attack = 0
     statistics = np.zeros(6)
     number_of_images = 0
+    dot_product = 0
     conv_kernel = None
     with_mask = hasattr(model.module, 'mask_head') and model.module.mask_head is not None
     if args.kernel_size != 0:
@@ -316,6 +321,8 @@ def attack_detector(args, model, cfg, dataset):
         imgs = data['img']
         for j in range(0, len(imgs.data)):
             imgs.data[j] = imgs.data[j].cuda()
+            if args.visualize:
+                visualize_modification(args, infer_model, imgs.data[j], j, data['img_meta'].data[j])
             imgs.data[j] = imgs.data[j].detach()
             imgs.data[j].requires_grad = True
             number_of_images += imgs.data[j].size()[0]
@@ -356,7 +363,6 @@ def attack_detector(args, model, cfg, dataset):
                         l1_per_img = torch.sum(torch.abs(update_direction), (1, 2, 3), keepdim=True)
                         l1_per_img = l1_per_img.expand(update_direction.size())
                         update_direction = update_direction / l1_per_img
-                        last_update_direction[j] = update_direction
                         imgs.data[j] = imgs.data[j] + epsilon / args. \
                             num_attack_iter * torch.sign(update_direction)
                     else:
@@ -367,11 +373,18 @@ def attack_detector(args, model, cfg, dataset):
                         l1_per_img = l1_per_img.expand(update_direction.size())
                         update_direction = update_direction / l1_per_img
                         update_direction += args.momentum * last_update_direction[j]
-                        last_update_direction[j] = update_direction
                         imgs.data[j] = imgs.data[j] + epsilon / args. \
                             num_attack_iter * torch.sign(update_direction)
                 imgs.data[j] = imgs.data[j].detach()
+                if args.visualize:
+                    visualize_modification(args, infer_model, copy.deepcopy(imgs.data[j]), j, data['img_meta'].data[j])
                 imgs.data[j].requires_grad = True
+                if args.visualize and _ > 0:
+                    dot_product += torch.sum(update_direction.view(-1) /
+                                             torch.norm(update_direction.view(-1)) *
+                                             last_update_direction[j].view(-1) /
+                                             torch.norm(last_update_direction[j].view(-1)))
+                last_update_direction[j] = update_direction
             model.zero_grad()
             pbar_inner.update(1)
         for j in range(0, cfg.gpus):
@@ -396,6 +409,9 @@ def attack_detector(args, model, cfg, dataset):
         pbar_outer.update(1)
     pbar_outer.close()
     pbar_inner.close()
+    if args.visualize and args.num_attack_iter > 1:
+        dot_product /= (args.num_attack_iter - 1) * number_of_images / args.imgs_per_gpu
+        print("average normalized dot product = ", dot_product)
     acc_before_attack /= max_batch
     acc_under_attack /= max_batch
     statistics /= number_of_images

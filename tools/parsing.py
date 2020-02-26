@@ -32,6 +32,7 @@ def parse_args():
         help='automatically scale lr with the number of gpus')
     parser.add_argument('--model_name', help='name of loaded model', default='mask_rcnn_r50_fpn_1x')
     parser.add_argument('--train', action='store_true', help='whether or not to train')
+    parser.add_argument('--visualize', action='store_true', help='whether or not visualize modification')
     parser.add_argument('--clear_output', action='store_true', help='whether or not to clear output path')
     parser.add_argument('--neglect_raw_stat', action='store_true', help='whether or not to neglect stat '
                                                                         'calculation of raw data')

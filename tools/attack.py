@@ -19,6 +19,7 @@ import xlwt
 import pandas as pd
 import datetime
 import itertools
+import mmcv
 
 
 def load_model(args):
@@ -45,6 +46,23 @@ def visualize():
         result = inference_detector(model, root + imgs[index])
         show_result(root + imgs[index], result, model.CLASSES, show=False, out_file=save_path + imgs[index])
     print('[INFO]Done.')
+
+
+def visualize_modification(args, model, imgs, index, metadata):
+    imgs = imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
+    num_of_imgs = imgs.size()[0]
+    imgs = imgs.detach().cpu().numpy()
+    for img_index in range(num_of_imgs):
+        img_mean = metadata[img_index]['img_norm_cfg']['mean'][::-1]
+        img_std = metadata[img_index]['img_norm_cfg']['std'][::-1]
+        imgs[img_index] = imgs[img_index] * img_std + img_mean
+        # result = inference_detector(model, imgs[img_index])
+        if not os.path.exists(args.save_path + str(index) + '/' + str(img_index)):
+            os.makedirs(args.save_path + str(index) + '/' + str(img_index))
+        save_path = args.save_path + str(index) + '/' + str(img_index) + '/' + str(datetime.datetime.now()) + '.jpg'
+        img = mmcv.imread(imgs[img_index])
+        # show_result(imgs[img_index], result, model.CLASSES, show=False, out_file=save_path)
+        mmcv.imwrite(img, save_path)
 
 
 def visualize_img(model, img, save_path):
@@ -188,15 +206,21 @@ if __name__ == "__main__":
                  'IoU_accuracy_under_attack', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
                  'max_attack_batches', 'seed', 'model_path', 'save_path']
     search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel', 'kernel_size']
+    # search_values = [[16.0],
+    #                  [['loss_rpn_bbox', 'loss_rpn_cls', 'loss_bbox', 'loss_cls'],
+    #                   ['loss_rpn_bbox', 'loss_cls'],
+    #                   ['loss_rpn_bbox'],
+    #                   ['loss_cls']],
+    #                  [1, 10, 20],
+    #                  [0, 1, 2],
+    #                  ['Uniform', 'Linear', 'Gaussian'],
+    #                  [0, 5, 11, 15]]
     search_values = [[16.0],
-                     [['loss_rpn_bbox', 'loss_rpn_cls', 'loss_bbox', 'loss_cls'],
-                      ['loss_rpn_bbox', 'loss_cls'],
-                      ['loss_rpn_bbox'],
-                      ['loss_cls']],
-                     [1, 10, 20],
-                     [0, 1, 2],
-                     ['Uniform', 'Linear', 'Gaussian'],
-                     [0, 5, 11, 15]]
+                     [['loss_rpn_bbox', 'loss_cls']],
+                     [5],
+                     [0],
+                     ['Gaussian'],
+                     [11]]
     if args_raw.model_name == 'rpn_r50_fpn_1x':
         search_values = [[16.0],
                          [['loss_rpn_bbox', 'loss_rpn_cls'],
