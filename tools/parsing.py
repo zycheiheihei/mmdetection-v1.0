@@ -37,6 +37,8 @@ def parse_args():
     parser.add_argument('--neglect_raw_stat', action='store_true', help='whether or not to neglect stat '
                                                                         'calculation of raw data')
     parser.add_argument('--model_path', type=str, default=None)
+    parser.add_argument('--black_box_model_path', type=str, default=None)
+    parser.add_argument('--black_box_model_name', type=str, default=None)
     parser.add_argument('--num_attack_iter', type=int, default=5)
     parser.add_argument('--epsilon', type=float, default=5.0)
     parser.add_argument('--momentum', type=float, default=0.0)
@@ -47,6 +49,7 @@ def parse_args():
     parser.add_argument('--kernel_size', type=int, default=0)
     parser.add_argument('--resume_experiment', type=int, default=0)
     args = parser.parse_args()
+    args.config_black_box = args.config + args.black_box_model_name + '.py'
     args.config += args.model_name + '.py'
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)

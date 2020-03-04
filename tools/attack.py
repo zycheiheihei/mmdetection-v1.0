@@ -30,7 +30,10 @@ def load_model(args):
         if args.model_path is None:
             print('Model path missing!')
             return
-        model = init_detector(args.config, args.model_path, device='cuda:0')
+        if args.black_box_model_path is not None:
+            model = init_detector(args.config_black_box, args.black_box_model_path, device='cuda:0')
+        else:
+            model = init_detector(args.config, args.model_path, device='cuda:0')
     model.eval()
     return model
 
@@ -227,7 +230,10 @@ if __name__ == "__main__":
                          [0, 5, 11, 15]]
     args_raw.MAP_before_attack = None
     args_search = copy.deepcopy(args_raw)
-    save_file_name = str(datetime.datetime.now()) + '.xlsx'
+    if args_search.black_box_model_path is None:
+        save_file_name = str(datetime.datetime.now()) + '.xlsx'
+    else:
+        save_file_name = str(datetime.datetime.now()) + '_attack_' + str(args_search.black_box_model_path) + '.xlsx'
     loaded_datasets = None
     experiment_index = 0
     for search_value in itertools.product(*search_values):
