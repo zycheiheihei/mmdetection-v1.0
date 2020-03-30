@@ -49,6 +49,8 @@ def parse_args():
     parser.add_argument('--kernel_size', type=int, default=0)
     parser.add_argument('--resume_experiment', type=int, default=0)
     args = parser.parse_args()
+    if args.black_box_model_name is None:
+        args.black_box_model_name = args.model_name
     args.config_black_box = args.config + args.black_box_model_name + '.py'
     args.config += args.model_name + '.py'
     if 'LOCAL_RANK' not in os.environ:

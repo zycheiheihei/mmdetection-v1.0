@@ -24,6 +24,7 @@ import threading
 from datetime import datetime
 import scipy.stats as st
 import shutil
+from mmdet.core import eval_map_attack
 
 
 class ThreadingWithResult(threading.Thread):
@@ -32,7 +33,7 @@ class ThreadingWithResult(threading.Thread):
         super(ThreadingWithResult, self).__init__()
         self.func = func
         self.args = args
-        self.result = -1 * np.ones(4)
+        self.result = [-1 * np.ones(6), None]
 
     def run(self):
         self.result = self.func(*self.args)
@@ -290,6 +291,7 @@ def attack_detector(args, model, cfg, dataset):
     print(str(datetime.now()) + ' - INFO - Imgs per GPU: ', cfg.data.imgs_per_gpu)
     print(str(datetime.now()) + ' - INFO - Workers per GPU: ', cfg.data.workers_per_gpu)
     print(str(datetime.now()) + ' - INFO - Momentum: ', args.momentum)
+    print(str(datetime.now()) + ' - INFO - Epsilon: ', args.epsilon)
     infer_model = load_model(args)
     attack_loader = build_dataloader(dataset, cfg.data.imgs_per_gpu, cfg.data.workers_per_gpu, cfg.gpus, dist=False)
     model = MMDataParallel(model, device_ids=range(cfg.gpus)).cuda()
@@ -300,6 +302,8 @@ def attack_detector(args, model, cfg, dataset):
                 shutil.rmtree(os.path.join(args.save_path, f))
             else:
                 os.remove(os.path.join(args.save_path, f))
+    class_names = infer_model.CLASSES
+    num_of_classes = len(infer_model.CLASSES)
     max_batch = min(attack_loader.__len__(), args.max_attack_batches)
     pbar_outer = tqdm(total=max_batch)
     pbar_inner = tqdm(total=args.num_attack_iter)
@@ -311,6 +315,7 @@ def attack_detector(args, model, cfg, dataset):
     dot_product = 0
     conv_kernel = None
     with_mask = hasattr(model.module, 'mask_head') and model.module.mask_head is not None
+    MAP_data = [[[None] * num_of_classes, [None] * num_of_classes], [[None] * num_of_classes, [None] * num_of_classes]]
     if args.kernel_size != 0:
         conv_kernel = conv_layer(args)
     for i, data in enumerate(attack_loader):
@@ -322,7 +327,13 @@ def attack_detector(args, model, cfg, dataset):
         for j in range(0, len(imgs.data)):
             imgs.data[j] = imgs.data[j].cuda()
             if args.visualize:
-                visualize_modification(args, infer_model, imgs.data[j], j, data['img_meta'].data[j])
+                if args.model_name == 'rpn_r50_fpn_1x':
+                    visualize_modification(args, infer_model, copy.deepcopy(imgs.data[j]), j,
+                                           data['img_meta'].data[j], data['gt_bboxes'].data[j])
+                else:
+                    visualize_modification(args, infer_model, copy.deepcopy(imgs.data[j]), j,
+                                           data['img_meta'].data[j], data['gt_bboxes'].data[j],
+                                           data['gt_labels'].data[j])
             imgs.data[j] = imgs.data[j].detach()
             imgs.data[j].requires_grad = True
             number_of_images += imgs.data[j].size()[0]
@@ -377,7 +388,13 @@ def attack_detector(args, model, cfg, dataset):
                             num_attack_iter * torch.sign(update_direction)
                 imgs.data[j] = imgs.data[j].detach()
                 if args.visualize:
-                    visualize_modification(args, infer_model, copy.deepcopy(imgs.data[j]), j, data['img_meta'].data[j])
+                    if args.model_name == 'rpn_r50_fpn_1x':
+                        visualize_modification(args, infer_model, copy.deepcopy(imgs.data[j]), j,
+                                               data['img_meta'].data[j], data['gt_bboxes'].data[j])
+                    else:
+                        visualize_modification(args, infer_model, copy.deepcopy(imgs.data[j]), j,
+                                               data['img_meta'].data[j], data['gt_bboxes'].data[j],
+                                               data['gt_labels'].data[j])
                 imgs.data[j].requires_grad = True
                 if args.visualize and _ > 0:
                     dot_product += torch.sum(update_direction.view(-1) /
@@ -392,18 +409,21 @@ def attack_detector(args, model, cfg, dataset):
                 t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
                                                                              imgs.data[j], raw_imgs.data[j],
                                                                              data['img_meta'].data[j],
-                                                                             data['gt_bboxes'].data[j]))
+                                                                             data['gt_bboxes'].data[j],
+                                                                             MAP_data))
             else:
                 t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
                                                                              imgs.data[j], raw_imgs.data[j],
                                                                              data['img_meta'].data[j],
                                                                              data['gt_bboxes'].data[j],
+                                                                             MAP_data,
                                                                              data['gt_labels'].data[j]))
             t.start()
             t.join()
             statistics_result = t.get_result()
-            if statistics_result[0] >= 0:
-                statistics += statistics_result
+            if statistics_result[0][0] >= 0:
+                statistics += statistics_result[0]
+                MAP_data = statistics_result[1]
             else:
                 print("Error! Results were not fetched!")
         pbar_outer.update(1)
@@ -415,17 +435,31 @@ def attack_detector(args, model, cfg, dataset):
     acc_before_attack /= max_batch
     acc_under_attack /= max_batch
     statistics /= number_of_images
+
     if args.neglect_raw_stat and args.experiment_index > args.resume_experiment:
         pass
     else:
         args.class_accuracy_before_attack = 100 * statistics[0]
         args.IoU_accuracy_before_attack = 100 * statistics[1]
-        args.MAP_before_attack = statistics[2]
+        args.IoU_accuracy_before_attack2 = 100 * statistics[2]
+        if MAP_data[0] is None:
+            args.MAP_before_attack = 0
+        else:
+            args.MAP_before_attack = eval_map_attack(MAP_data[0][0], MAP_data[0][1], len(class_names),
+                                                     scale_ranges=None, iou_thr=0.5,
+                                                     dataset=class_names, print_summary=True)[0]
     args.class_accuracy_under_attack = 100 * statistics[3]
     args.IoU_accuracy_under_attack = 100 * statistics[4]
-    args.MAP_under_attack = statistics[5]
+    args.IoU_accuracy_under_attack2 = 100 * statistics[5]
+    if MAP_data[1] is None:
+        args.MAP_under_attack = 0
+    else:
+        args.MAP_under_attack = eval_map_attack(MAP_data[1][0], MAP_data[1][1], len(class_names),
+                                                scale_ranges=None, iou_thr=0.5,
+                                                dataset=class_names, print_summary=True)[0]
     args.class_accuracy_decrease = args.class_accuracy_before_attack - args.class_accuracy_under_attack
     args.IoU_accuracy_decrease = args.IoU_accuracy_before_attack - args.IoU_accuracy_under_attack
+    args.IoU_accuracy_decrease2 = args.IoU_accuracy_before_attack2 - args.IoU_accuracy_under_attack2
     args.MAP_decrease = 100 * (args.MAP_before_attack - args.MAP_under_attack)
     print("Class & IoU accuracy before attack = %g %g" % (args.class_accuracy_before_attack,
                                                           args.IoU_accuracy_before_attack))

@@ -4,6 +4,7 @@ from terminaltables import AsciiTable
 
 from .bbox_overlaps import bbox_overlaps
 from .class_names import get_classes
+import pdb
 
 
 def average_precision(recalls, precisions, mode='area'):
@@ -299,6 +300,113 @@ def eval_map(det_results,
             precisions = precisions[0, :]
             num_gts = num_gts.item()
         mode = 'area' if dataset != 'voc07' else '11points'
+        ap = average_precision(recalls, precisions, mode)
+        eval_results.append({
+            'num_gts': num_gts,
+            'num_dets': num_dets,
+            'recall': recalls,
+            'precision': precisions,
+            'ap': ap
+        })
+    if scale_ranges is not None:
+        # shape (num_classes, num_scales)
+        all_ap = np.vstack([cls_result['ap'] for cls_result in eval_results])
+        all_num_gts = np.vstack(
+            [cls_result['num_gts'] for cls_result in eval_results])
+        mean_ap = []
+        for i in range(num_scales):
+            if np.any(all_num_gts[:, i] > 0):
+                mean_ap.append(all_ap[all_num_gts[:, i] > 0, i].mean())
+            else:
+                mean_ap.append(0.0)
+    else:
+        aps = []
+        for cls_result in eval_results:
+            if cls_result['num_gts'] > 0:
+                aps.append(cls_result['ap'])
+        mean_ap = np.array(aps).mean().item() if aps else 0.0
+    if print_summary:
+        print_map_summary(mean_ap, eval_results, dataset)
+
+    return mean_ap, eval_results
+
+
+def eval_map_attack(det_results,
+                    gt_bboxes,
+                    num_classes,
+                    scale_ranges=None,
+                    iou_thr=0.5,
+                    dataset=None,
+                    print_summary=True):
+    """Evaluate mAP of a dataset.
+
+    Args:
+        det_results (list): a list of list
+        gt_bboxes (list): ground truth bboxes of each cls
+        num_classes (int): number of classes
+        scale_ranges (list, optional): [(min1, max1), (min2, max2), ...]
+        iou_thr (float): IoU threshold
+        dataset (None or str or list): dataset name or dataset classes, there
+            are minor differences in metrics for different datsets, e.g.
+            "voc07", "imagenet_det", etc.
+        print_summary (bool): whether to print the mAP summary
+
+    Returns:
+        tuple: (mAP, [dict, dict, ...])
+    """
+    area_ranges = ([(rg[0]**2, rg[1]**2) for rg in scale_ranges]
+                   if scale_ranges is not None else None)
+    num_scales = len(scale_ranges) if scale_ranges is not None else 1
+    eval_results = []
+    for i in range(num_classes):
+        # get gt and det bboxes of this class
+        cls_dets, cls_gts = det_results[i], gt_bboxes[i]
+        # calculate tp and fp for each image
+        cls_gt_ignore = []
+        if cls_dets is None:
+            continue
+        for j in range(len(cls_gts)):
+            if cls_gts[j].shape[0] > 0:
+                cls_gt_ignore.append(np.zeros(cls_gts[j].shape[0], dtype=np.int32))
+            else:
+                cls_gt_ignore.append(cls_gts[j])
+        tpfp_func = (
+            tpfp_imagenet if dataset in ['det', 'vid'] else tpfp_default)
+        tpfp = []
+        for j in range(len(cls_dets)):
+            tpfp.append(tpfp_func(cls_dets[j], cls_gts[j], cls_gt_ignore[j], iou_thr, area_ranges))
+        tp, fp = tuple(zip(*tpfp))
+        # calculate gt number of each scale, gts ignored or beyond scale
+        # are not counted
+        num_gts = np.zeros(num_scales, dtype=int)
+        for j, bbox in enumerate(cls_gts):
+            if area_ranges is None:
+                num_gts[0] += np.sum(np.logical_not(cls_gt_ignore[j]))
+            else:
+                gt_areas = (bbox[:, 2] - bbox[:, 0] + 1) * (
+                    bbox[:, 3] - bbox[:, 1] + 1)
+                for k, (min_area, max_area) in enumerate(area_ranges):
+                    num_gts[k] += np.sum(
+                        np.logical_not(cls_gt_ignore[j])
+                        & (gt_areas >= min_area) & (gt_areas < max_area))
+        # sort all det bboxes by score, also sort tp and fp
+        cls_dets = np.vstack(cls_dets)
+        num_dets = cls_dets.shape[0]
+        sort_inds = np.argsort(-cls_dets[:, -1])
+        tp = np.hstack(tp)[:, sort_inds]
+        fp = np.hstack(fp)[:, sort_inds]
+        # calculate recall and precision with tp and fp
+        tp = np.cumsum(tp, axis=1)
+        fp = np.cumsum(fp, axis=1)
+        eps = np.finfo(np.float32).eps
+        recalls = tp / np.maximum(num_gts[:, np.newaxis], eps)
+        precisions = tp / np.maximum((tp + fp), eps)
+        # calculate AP
+        if scale_ranges is None:
+            recalls = recalls[0, :]
+            precisions = precisions[0, :]
+            num_gts = num_gts.item()
+        mode = 'area'
         ap = average_precision(recalls, precisions, mode)
         eval_results.append({
             'num_gts': num_gts,

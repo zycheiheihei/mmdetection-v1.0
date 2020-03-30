@@ -10,6 +10,8 @@ import pdb
 from mmdet.core import get_classes
 from mmdet.datasets.pipelines import Compose
 from mmdet.models import build_detector
+from mmcv.image import imread, imwrite
+import cv2
 
 
 def init_detector(config, checkpoint=None, device='cuda:0'):
@@ -190,7 +192,72 @@ def calc_map(map_iou, map_label):
     return map_area / len_positive
 
 
-def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
+def imshow_det_bboxes(img,
+                      bboxes,
+                      labels,
+                      class_names=None,
+                      score_thr=0,
+                      thickness=2,
+                      font_scale=1,
+                      show=True,
+                      win_name='',
+                      wait_time=0,
+                      out_file=None):
+    """Draw bboxes and class labels (with scores) on an image.
+    Args:
+        img (str or ndarray): The image to be displayed.
+        bboxes (ndarray): Bounding boxes (with scores), shaped (n, 4) or
+            (n, 5).
+        labels (ndarray): Labels of bboxes.
+        class_names (list[str]): Names of each classes.
+        score_thr (float): Minimum score of bboxes to be shown.
+        bbox_color (str or tuple or :obj:`Color`): Color of bbox lines.
+        text_color (str or tuple or :obj:`Color`): Color of texts.
+        thickness (int): Thickness of lines.
+        font_scale (float): Font scales of texts.
+        show (bool): Whether to show the image.
+        win_name (str): The window name.
+        wait_time (int): Value of waitKey param.
+        out_file (str or None): The filename to write the image.
+    """
+    assert bboxes.ndim == 2
+    assert labels.ndim == 1
+    assert bboxes.shape[0] == labels.shape[0]
+    assert bboxes.shape[1] == 4 or bboxes.shape[1] == 5
+    img = imread(img)
+
+    if score_thr > 0:
+        assert bboxes.shape[1] == 5
+        scores = bboxes[:, -1]
+        inds = scores > score_thr
+        bboxes = bboxes[inds, :]
+        labels = labels[inds]
+
+    cm = plt.cm.get_cmap('RdYlBu')
+    text_color = (0, 255, 0)
+
+    for bbox, label in zip(bboxes, labels):
+        bbox_int = bbox.astype(np.int32)
+        left_top = (bbox_int[0], bbox_int[1])
+        right_bottom = (bbox_int[2], bbox_int[3])
+        bbox_color = cm(label / 90.0)
+        bbox_color = (int(bbox_color[0]*255), int(bbox_color[1]*255), int(bbox_color[2]*255))
+        cv2.rectangle(
+            img, left_top, right_bottom, bbox_color, thickness=thickness)
+        label_text = class_names[
+            label] if class_names is not None else 'cls {}'.format(label)
+        if len(bbox) > 4:
+            label_text += '|{:.02f}'.format(bbox[-1])
+        cv2.putText(img, label_text, (bbox_int[0], bbox_int[1] - 2),
+                    cv2.FONT_HERSHEY_COMPLEX, font_scale, text_color)
+
+    if show:
+        imshow(img, win_name, wait_time)
+    if out_file is not None:
+        imwrite(img, out_file)
+
+
+def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels, map_data,
                          score_thr=0.3, wait_time=0, show=True, out_file=None):
     """Visualize the detection results on the image.
 
@@ -199,8 +266,9 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
         result (tuple[list] or list): The detection result, can be either
             (bbox, segm) or just bbox.
         class_names (list[str] or tuple[str]): A list of class names.
-        gt_labels: ground truth (labels).
         gt_bboxes: ground truth (bboxes).
+        gt_labels: ground truth (labels).
+        map_data: data for map.
         score_thr (float): The threshold to visualize the bboxes and masks.
         wait_time (int): Value of waitKey param.
         show (bool, optional): Whether to show the image with opencv or not.
@@ -238,7 +306,7 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
         if out_file:
             gt_labels = np.array([0] * len(gt_bboxes))
             labels = np.array([0] * len(bboxes))
-            mmcv.imshow_det_bboxes(
+            imshow_det_bboxes(
                 img.copy(),
                 gt_bboxes,
                 gt_labels,
@@ -247,7 +315,7 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
                 show=show,
                 wait_time=wait_time,
                 out_file=out_file + '_gt.jpg')
-            mmcv.imshow_det_bboxes(
+            imshow_det_bboxes(
                 img,
                 bboxes,
                 labels,
@@ -265,11 +333,11 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
                 map_iou.append(max_iou)
             else:
                 map_iou.append(0)
-        return 0, float(sum(map_iou)) / len(map_iou), 0
+        return 0, float(sum(map_iou)) / len(map_iou), 0, None
     else:
         gt_labels = gt_labels.numpy() - 1
     if out_file:
-        mmcv.imshow_det_bboxes(
+        imshow_det_bboxes(
             img.copy(),
             gt_bboxes,
             gt_labels,
@@ -278,7 +346,7 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
             show=show,
             wait_time=wait_time,
             out_file=out_file + '_gt.jpg')
-        mmcv.imshow_det_bboxes(
+        imshow_det_bboxes(
             img,
             bboxes,
             labels,
@@ -294,7 +362,19 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
     class_acc = 0
     map_iou = []
     map_label = []
+    flag0 = np.zeros(len(class_names))
+    flag1 = np.zeros(len(class_names))
     for i in range(0, len(gt_labels)):
+        if map_data[1][gt_labels[i]] is None:
+            if flag1[gt_labels[i]] == 0:
+                map_data[1][gt_labels[i]] = [np.array([gt_bboxes[i]])]
+                flag1[gt_labels[i]] = 1
+        else:
+            if flag1[gt_labels[i]] == 0:
+                map_data[1][gt_labels[i]].append(np.array([gt_bboxes[i]]))
+                flag1[gt_labels[i]] = 1
+            else:
+                map_data[1][gt_labels[i]][-1] = np.concatenate((map_data[1][gt_labels[i]][-1], np.array([gt_bboxes[i]])))
         match_index, max_iou = iou_vector(bboxes, gt_bboxes[i])
         if match_index > -1:
             map_iou.append(max_iou)
@@ -304,14 +384,36 @@ def show_result_plus_acc(img, result, class_names, gt_bboxes, gt_labels,
                 map_label.append(1)
             else:
                 map_label.append(0)
+    for i in range(0, len(labels)):
+        if map_data[0][labels[i]] is None:
+            if flag0[labels[i]] == 0:
+                map_data[0][labels[i]] = [np.array([bboxes[i]])]
+                flag0[labels[i]] = 1
+        else:
+            if flag0[labels[i]] == 0:
+                map_data[0][labels[i]].append(np.array([bboxes[i]]))
+                flag0[labels[i]] = 1
+            else:
+                map_data[0][labels[i]][-1] = np.concatenate((map_data[0][labels[i]][-1], np.array([bboxes[i]])))
+    for i in range(len(class_names)):
+        if flag0[i] == 0 and flag1[i] == 1:
+            if len(map_data[1][i]) == 1:
+                map_data[1][i] = None
+            else:
+                map_data[1][i].pop()
+        if flag0[i] == 1 and flag1[i] == 0:
+            if map_data[1][i] is None:
+                map_data[1][i] = [np.array([])]
+            else:
+                map_data[1][i].append(np.array([]))
     if class_acc == 0:
         iou_acc = 0
-        map_area = 0
+        iou_acc2 = 0
     else:
+        iou_acc2 = iou_acc / len(gt_labels)
         iou_acc /= class_acc
         class_acc /= len(gt_labels)
-        map_area = calc_map(np.array(map_iou), np.array(map_label))
-    return class_acc, iou_acc, map_area
+    return class_acc, iou_acc, iou_acc2, map_data
 
 
 def show_result_pyplot(img,

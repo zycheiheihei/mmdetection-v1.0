@@ -51,7 +51,7 @@ def visualize():
     print('[INFO]Done.')
 
 
-def visualize_modification(args, model, imgs, index, metadata):
+def visualize_modification(args, model, imgs, index, metadata, gt_bboxes, gt_labels=None):
     imgs = imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
     num_of_imgs = imgs.size()[0]
     imgs = imgs.detach().cpu().numpy()
@@ -64,8 +64,13 @@ def visualize_modification(args, model, imgs, index, metadata):
             os.makedirs(args.save_path + str(index) + '/' + str(img_index))
         save_path = args.save_path + str(index) + '/' + str(img_index) + '/' + str(datetime.datetime.now()) + '.jpg'
         img = mmcv.imread(imgs[img_index])
+        result = inference_detector(model, img)
+        show_result_plus_acc(img, result, model.CLASSES, gt_bboxes[img_index], gt_labels[img_index],
+                             [[[None] * num_of_classes, [None] * num_of_classes],
+                              [[None] * num_of_classes, [None] * num_of_classes]], show=False,
+                             out_file=save_path)
         # show_result(imgs[img_index], result, model.CLASSES, show=False, out_file=save_path)
-        mmcv.imwrite(img, save_path)
+        # mmcv.imwrite(img, save_path)
 
 
 def visualize_img(model, img, save_path):
@@ -95,22 +100,24 @@ def visualize_all_images(args, model, imgs, raw_imgs, metadata):
     return
 
 
-def visualize_img_plus_acc(model, img, metadata, gt_bboxes, gt_labels, save_path):
+def visualize_img_plus_acc(model, img, metadata, gt_bboxes, gt_labels, save_path, map_data):
     img_mean = metadata['img_norm_cfg']['mean'][::-1]
     img_std = metadata['img_norm_cfg']['std'][::-1]
     img = img * img_std + img_mean
     result = inference_detector(model, img)
-    return show_result_plus_acc(img, result, model.CLASSES, gt_bboxes, gt_labels, show=False, out_file=save_path)
+    return show_result_plus_acc(img, result, model.CLASSES, gt_bboxes, gt_labels,
+                                map_data, show=False, out_file=save_path)
 
 
-def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bboxes, gt_labels=None):
+def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bboxes, map_data, gt_labels=None):
     imgs = imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
     raw_imgs = raw_imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
     imgs = imgs.detach().cpu().numpy()
     raw_imgs = raw_imgs.numpy()
     raw_class_acc, raw_iou_acc = 0, 0
     class_acc, iou_acc = 0, 0
-    raw_map_area, map_area = 0, 0
+    raw_iou_acc2 = 0
+    iou_acc2 = 0
     if gt_labels is None:
         gt_labels = [-1] * np.shape(imgs)[0]
     for index in range(0, np.shape(imgs)[0]):
@@ -118,29 +125,29 @@ def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bbox
         (_, filename) = os.path.split(raw_filename)
         filename = filename.split('.', 2)[0]
         if torch.rand(1) < args.save_ratio:
-            raw_class_acc_image, raw_iou_acc_image, raw_map_area_image = visualize_img_plus_acc(
+            raw_class_acc_image, raw_iou_acc_image, raw_iou_acc_image2, map_data[0] = visualize_img_plus_acc(
                 model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index],
-                args.save_path + filename)
-            class_acc_image, iou_acc_image, map_area_image = visualize_img_plus_acc(
+                args.save_path + filename, map_data[0])
+            class_acc_image, iou_acc_image, iou_acc_image2, map_data[1] = visualize_img_plus_acc(
                 model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index],
-                args.save_path + filename + '_attack')
+                args.save_path + filename + '_attack', map_data[1])
         else:
             if args.neglect_raw_stat and args.experiment_index > args.resume_experiment:
                 raw_class_acc_image = 0
                 raw_iou_acc_image = 0
-                raw_map_area_image = 0
+                raw_iou_acc_image2 = 0
             else:
-                raw_class_acc_image, raw_iou_acc_image, raw_map_area_image = visualize_img_plus_acc(
-                    model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None)
-            class_acc_image, iou_acc_image, map_area_image = visualize_img_plus_acc(
-                model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None)
+                raw_class_acc_image, raw_iou_acc_image, raw_iou_acc_image2, map_data[0] = visualize_img_plus_acc(
+                    model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None, map_data[0])
+            class_acc_image, iou_acc_image, iou_acc_image2, map_data[1] = visualize_img_plus_acc(
+                model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index], None, map_data[1])
         raw_class_acc += raw_class_acc_image
         raw_iou_acc += raw_iou_acc_image
-        raw_map_area += raw_map_area_image
+        raw_iou_acc2 += raw_iou_acc_image2
         class_acc += class_acc_image
         iou_acc += iou_acc_image
-        map_area += map_area_image
-    return np.array([raw_class_acc, raw_iou_acc, raw_map_area, class_acc, iou_acc, map_area])
+        iou_acc2 += iou_acc_image2
+    return np.array([raw_class_acc, raw_iou_acc, raw_iou_acc2, class_acc, iou_acc, iou_acc2]), map_data
 
 
 def attack(args, datasets):
@@ -204,9 +211,10 @@ if __name__ == "__main__":
     result_dict_list = []
     args_raw = parse_args()
     save_keys = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel', 'kernel_size', 'MAP_decrease',
-                 'class_accuracy_decrease', 'IoU_accuracy_decrease', 'MAP_before_attack', 'MAP_under_attack',
-                 'class_accuracy_before_attack', 'class_accuracy_under_attack', 'IoU_accuracy_before_attack',
-                 'IoU_accuracy_under_attack', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
+                 'class_accuracy_decrease', 'IoU_accuracy_decrease', 'IoU_accuracy_decrease2', 'MAP_before_attack',
+                 'MAP_under_attack', 'class_accuracy_before_attack', 'class_accuracy_under_attack',
+                 'IoU_accuracy_before_attack', 'IoU_accuracy_under_attack', 'IoU_accuracy_before_attack2',
+                 'IoU_accuracy_under_attack2', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
                  'max_attack_batches', 'seed', 'model_path', 'save_path']
     search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel', 'kernel_size']
     search_values = [[16.0],
@@ -217,10 +225,10 @@ if __name__ == "__main__":
                      [0, 5, 11, 15]]
     # search_values = [[16.0],
     #                  [['loss_rpn_bbox', 'loss_cls']],
-    #                  [5],
-    #                  [0],
+    #                  [10],
+    #                  [2],
     #                  ['Gaussian'],
-    #                  [11]]
+    #                  [15]]
     if args_raw.model_name == 'rpn_r50_fpn_1x':
         search_values = [[16.0],
                          [['loss_rpn_bbox', 'loss_rpn_cls']],
