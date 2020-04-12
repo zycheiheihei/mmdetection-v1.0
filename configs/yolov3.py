@@ -1,7 +1,7 @@
 input_size = 416
 model = dict(
     type='SingleStageDetector',
-    pretrained='./weights/darknet53_weights.pth',
+    # pretrained='./weights/darknet53_weights.pth',
     backbone=dict(
         type='DarkNet',
         input_size=input_size,
@@ -41,9 +41,10 @@ test_cfg = dict(
     score_thr=0.02,
     max_per_img=200)
 
-dataset_type = 'VOCDataset'
-data_root = 'data/VOCdevkit/'
-img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[1, 1, 1], to_rgb=True)
+dataset_type = 'CocoDataset'
+data_root = '/home/fengyao/MSCOCO2017dataset'
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
     dict(type='LoadImageFromFile', to_float32=True),
     dict(type='LoadAnnotations', with_bbox=True),
@@ -89,25 +90,27 @@ data = dict(
         times=1,
         dataset=dict(
             type=dataset_type,
-            ann_file=[
-                data_root + 'VOC2007/ImageSets/Main/trainval.txt',
-                data_root + 'VOC2012/ImageSets/Main/trainval.txt'
-            ],
-            img_prefix=[data_root + 'VOC2007/', data_root + 'VOC2012/'],
+            ann_file=data_root + '/train/annotations/instances_train2017.json',
+            img_prefix=data_root + '/train/train2017/',
             pipeline=train_pipeline)),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'VOC2007/ImageSets/Main/test.txt',
-        img_prefix=data_root + 'VOC2007/',
+        ann_file=data_root + '/val/annotations/instances_val2017.json',
+        img_prefix=data_root + '/val/val2017/',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'VOC2007/ImageSets/Main/test.txt',
-        img_prefix=data_root + 'VOC2007/',
+        ann_file=data_root + '/val/annotations/instances_val2017.json',
+        img_prefix=data_root + '/val/val2017/',
         pipeline=test_pipeline))
-optimizer = dict(type='SGD', lr=1e-3, momentum=0.9, weight_decay=0.0005)
+optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-lr_config = dict(policy='step', step=[80, 90])
+lr_config = dict(
+    policy='step',
+    warmup='linear',
+    warmup_iters=500,
+    warmup_ratio=1.0 / 3,
+    step=[8, 11])
 checkpoint_config = dict(interval=1)
 log_config = dict(
     interval=50,
@@ -115,11 +118,10 @@ log_config = dict(
         dict(type='TextLoggerHook'),
         # dict(type='TensorboardLoggerHook')
     ])
-total_epochs = 100
+total_epochs = 12
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/yolov3'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]
-checkpoint = work_dir + '/latest.pth'
