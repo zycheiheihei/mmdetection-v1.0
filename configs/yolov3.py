@@ -1,7 +1,7 @@
 input_size = 416
 model = dict(
     type='SingleStageDetector',
-    pretrained='./weights/darknet53_weights.pth',
+    # pretrained='./weights/darknet53_weights.pth',
     backbone=dict(
         type='DarkNet',
         input_size=input_size,
