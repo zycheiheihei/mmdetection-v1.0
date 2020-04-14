@@ -1,7 +1,7 @@
 input_size = 416
 model = dict(
     type='SingleStageDetector',
-    # pretrained='./weights/darknet53_weights.pth',
+    pretrained='./weights/darknet53_weights.pth',
     backbone=dict(
         type='DarkNet',
         input_size=input_size,
@@ -103,14 +103,9 @@ data = dict(
         ann_file=data_root + '/val/annotations/instances_val2017.json',
         img_prefix=data_root + '/val/val2017/',
         pipeline=test_pipeline))
-optimizer = dict(type='SGD', lr=0.02, momentum=0.9, weight_decay=0.0001)
+optimizer = dict(type='SGD', lr=1e-3, momentum=0.9, weight_decay=0.0005)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-lr_config = dict(
-    policy='step',
-    warmup='linear',
-    warmup_iters=500,
-    warmup_ratio=1.0 / 3,
-    step=[8, 11])
+lr_config = dict(policy='step', step=[80, 90])
 checkpoint_config = dict(interval=1)
 log_config = dict(
     interval=50,
@@ -118,10 +113,11 @@ log_config = dict(
         dict(type='TextLoggerHook'),
         # dict(type='TensorboardLoggerHook')
     ])
-total_epochs = 12
+total_epochs = 100
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/yolov3'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]
+checkpoint = work_dir + '/latest.pth'
