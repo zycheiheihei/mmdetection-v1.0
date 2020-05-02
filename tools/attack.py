@@ -55,6 +55,7 @@ def visualize_modification(args, model, imgs, index, metadata, gt_bboxes, gt_lab
     imgs = imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
     num_of_imgs = imgs.size()[0]
     imgs = imgs.detach().cpu().numpy()
+    num_of_classes = len(model.CLASSES)
     for img_index in range(num_of_imgs):
         img_mean = metadata[img_index]['img_norm_cfg']['mean'][::-1]
         img_std = metadata[img_index]['img_norm_cfg']['std'][::-1]
@@ -66,8 +67,7 @@ def visualize_modification(args, model, imgs, index, metadata, gt_bboxes, gt_lab
         img = mmcv.imread(imgs[img_index])
         result = inference_detector(model, img)
         show_result_plus_acc(img, result, model.CLASSES, gt_bboxes[img_index], gt_labels[img_index],
-                             [[[None] * num_of_classes, [None] * num_of_classes],
-                              [[None] * num_of_classes, [None] * num_of_classes]], show=False,
+                             [[None] * num_of_classes, [None] * num_of_classes], show=False,
                              out_file=save_path)
         # show_result(imgs[img_index], result, model.CLASSES, show=False, out_file=save_path)
         # mmcv.imwrite(img, save_path)
