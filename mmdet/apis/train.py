@@ -25,6 +25,7 @@ from datetime import datetime
 import scipy.stats as st
 import shutil
 from mmdet.core import eval_map_attack
+import torchvision.transforms as transforms
 
 
 class ThreadingWithResult(threading.Thread):
@@ -264,7 +265,7 @@ def conv_layer(args):
         kernel = kernel_raw / kernel_raw.sum()
         kernel = kernel.astype(np.float32)
         weight = np.stack([kernel, kernel, kernel])
-        weight = torch.Tensor(weight).unsqueeze(0).cuda()
+        weight = torch.Tensor(weight).unsqueeze(1).cuda()
     elif args.kernel == 'Linear':
         x = np.linspace(0, 1, (args.kernel_size + 1) // 2)
         kern1d = np.concatenate((x, x[np.size(x) - 2::-1]))
@@ -272,17 +273,18 @@ def conv_layer(args):
         kernel = kernel_raw / kernel_raw.sum()
         kernel = kernel.astype(np.float32)
         weight = np.stack([kernel, kernel, kernel])
-        weight = torch.Tensor(weight).unsqueeze(0).cuda()
+        weight = torch.Tensor(weight).unsqueeze(1).cuda()
     elif args.kernel == 'Uniform':
         kern1d = np.ones(args.kernel_size)
         kernel_raw = np.outer(kern1d, kern1d)
         kernel = kernel_raw / kernel_raw.sum()
         kernel = kernel.astype(np.float32)
         weight = np.stack([kernel, kernel, kernel])
-        weight = torch.Tensor(weight).unsqueeze(0).cuda()
+        weight = torch.Tensor(weight).unsqueeze(1).cuda()
 
     def conv(input_data):
-        return torch.nn.functional.conv2d(input_data, weight, bias=None, stride=1, padding=(args.kernel_size - 1) // 2)
+        return torch.nn.functional.conv2d(input_data, weight, bias=None, stride=1, padding=(args.kernel_size - 1) // 2,
+                                          groups=3)
     return conv
 
 
@@ -335,18 +337,71 @@ def attack_detector(args, model, cfg, dataset):
                                            data['img_meta'].data[j], data['gt_bboxes'].data[j],
                                            data['gt_labels'].data[j])
             imgs.data[j] = imgs.data[j].detach()
-            imgs.data[j].requires_grad = True
+            if args.DIM:
+                imgs.data[j].requires_grad = False
+            else:
+                imgs.data[j].requires_grad = True
             number_of_images += imgs.data[j].size()[0]
         pbar_inner.reset()
         last_update_direction = list(range(0, len(imgs.data)))
         for _ in range(args.num_attack_iter):
+            if args.DIM:
+                trans_imgs = copy.deepcopy(imgs)
+                for j in range(0, len(trans_imgs.data)):
+                    trans_imgs.data[j].requires_grad = True
+                    if torch.rand((1, 1))[0][0] < 0.7:
+                        original_size = trans_imgs.data[j].size()
+                        resize_ratio = torch.rand((1, 1))[0][0] * 0.1 + 0.9
+                        pad_size_x = original_size[2] - int(resize_ratio * original_size[2])
+                        pad_size_y = original_size[3] - int(resize_ratio * original_size[3])
+                        img_data = []
+                        for k in range(0, original_size[0]):
+                            transform = transforms.Compose([
+                                transforms.Scale(
+                                    (int(resize_ratio * original_size[2]), int(resize_ratio * original_size[3]))),
+                                transforms.ToTensor(),
+                            ])
+                            img_temp = transform(transforms.ToPILImage()(trans_imgs.data[j][k].cpu().float()))
+                            data['gt_bboxes'].data[j][k] *= resize_ratio
+                            img_data.append(img_temp)
+                            mask_data = []
+                            for l in range(np.shape(data['gt_masks'].data[j][k])[0]):
+                                transform_mask = transforms.Compose([
+                                    transforms.Scale((int(resize_ratio * original_size[2]),
+                                                      int(resize_ratio * original_size[3]))),
+                                    transforms.ToTensor(),
+                                ])
+                                mask_temp = transform_mask(transforms.ToPILImage()(data['gt_masks'].data[j][k][l]))
+                                mask_temp = torch.where(mask_temp > 0, torch.ones_like(mask_temp),
+                                                        torch.zeros_like(mask_temp))
+                                mask_data.append(mask_temp)
+                            mask_data = torch.cat(tuple(mask_data), dim=0)
+                            mask_data = torch.cat((mask_data,
+                                                   torch.zeros((mask_data.size()[0],
+                                                                mask_data.size()[1], pad_size_y))), dim=2)
+                            mask_data = torch.cat((mask_data,
+                                                   torch.zeros((mask_data.size()[0],
+                                                                pad_size_x, mask_data.size()[2]))), dim=1)
+                            data['gt_masks'].data[j][k] = mask_data.numpy().astype(np.uint8)
+                        trans_imgs.data[j] = torch.stack(tuple(img_data), dim=0).cuda()
+                        trans_imgs.data[j] = torch.cat((trans_imgs.data[j],
+                                                        torch.zeros((
+                                                            trans_imgs.data[j].size()[0], 3,
+                                                            trans_imgs.data[j].size()[2], pad_size_y)).cuda()), dim=3)
+                        trans_imgs.data[j] = torch.cat((trans_imgs.data[j],
+                                                        torch.zeros((
+                                                            trans_imgs.data[j].size()[0], 3,
+                                                            pad_size_x, trans_imgs.data[j].size()[3])).cuda()), dim=2)
+                        trans_imgs.data[j].requires_grad = True
+            else:
+                trans_imgs = imgs
             if args.model_name == 'rpn_r50_fpn_1x':
-                result = model(imgs, data['img_meta'], return_loss=True, gt_bboxes=data['gt_bboxes'])
+                result = model(trans_imgs, data['img_meta'], return_loss=True, gt_bboxes=data['gt_bboxes'])
             elif with_mask:
-                result = model(imgs, data['img_meta'], return_loss=True, gt_bboxes=data['gt_bboxes'],
+                result = model(trans_imgs, data['img_meta'], return_loss=True, gt_bboxes=data['gt_bboxes'],
                                gt_labels=data['gt_labels'], gt_masks=data['gt_masks'])
             else:
-                result = model(imgs, data['img_meta'], return_loss=True,
+                result = model(trans_imgs, data['img_meta'], return_loss=True,
                                gt_bboxes=data['gt_bboxes'], gt_labels=data['gt_labels'])
             loss = 0
             for key in args.loss_keys:
@@ -358,7 +413,7 @@ def attack_detector(args, model, cfg, dataset):
             loss.backward()
             for j in range(0, len(imgs.data)):
                 if args.momentum == 0:
-                    update_direction = imgs.data[j].grad
+                    update_direction = trans_imgs.data[j].grad
                     if conv_kernel:
                         update_direction = conv_kernel(update_direction)
                     l1_per_img = torch.sum(torch.abs(update_direction), (1, 2, 3), keepdim=True)
@@ -368,7 +423,7 @@ def attack_detector(args, model, cfg, dataset):
                         num_attack_iter * torch.sign(update_direction)
                 else:
                     if _ == 0:
-                        update_direction = imgs.data[j].grad
+                        update_direction = trans_imgs.data[j].grad
                         if conv_kernel:
                             update_direction = conv_kernel(update_direction)
                         l1_per_img = torch.sum(torch.abs(update_direction), (1, 2, 3), keepdim=True)
@@ -377,7 +432,7 @@ def attack_detector(args, model, cfg, dataset):
                         imgs.data[j] = imgs.data[j] + epsilon / args. \
                             num_attack_iter * torch.sign(update_direction)
                     else:
-                        update_direction = imgs.data[j].grad
+                        update_direction = trans_imgs.data[j].grad
                         if conv_kernel:
                             update_direction = conv_kernel(update_direction)
                         l1_per_img = torch.sum(torch.abs(update_direction), (1, 2, 3), keepdim=True)
