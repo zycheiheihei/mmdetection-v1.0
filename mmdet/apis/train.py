@@ -361,7 +361,15 @@ def attack_detector(args, model, cfg, dataset):
                                     (int(resize_ratio * original_size[2]), int(resize_ratio * original_size[3]))),
                                 transforms.ToTensor(),
                             ])
-                            img_temp = transform(transforms.ToPILImage()(trans_imgs.data[j][k].cpu().float()))
+                            norm_cfg = data['img_meta'].data[j][k]['img_norm_cfg']
+                            img_temp = trans_imgs.data[j][k].cpu().float()
+                            for channel in range(3):
+                                img_temp[channel] = img_temp[channel] * norm_cfg['std'][channel] + \
+                                                    norm_cfg['mean'][channel]
+                            img_temp = transform(transforms.ToPILImage()(img_temp / 255.0)) * 255.0
+                            for channel in range(3):
+                                img_temp[channel] = (img_temp[channel] - norm_cfg['mean'][channel]) \
+                                                    / norm_cfg['std'][channel]
                             data['gt_bboxes'].data[j][k] *= resize_ratio
                             img_data.append(img_temp)
                             mask_data = []
