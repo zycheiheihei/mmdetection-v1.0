@@ -356,6 +356,11 @@ def attack_detector(args, model, cfg, dataset):
                         pad_size_y = original_size[3] - int(resize_ratio * original_size[3])
                         img_data = []
                         for k in range(0, original_size[0]):
+                            size_meta = data['img_meta'].data[j][k]['img_shape']
+                            assert size_meta[2] == 3
+                            data['img_meta'].data[j][k]['img_shape'] = (int(size_meta[0] * resize_ratio),
+                                                                        int(size_meta[1] * resize_ratio),
+                                                                        size_meta[2])
                             transform = transforms.Compose([
                                 transforms.Scale(
                                     (int(resize_ratio * original_size[2]), int(resize_ratio * original_size[3]))),
