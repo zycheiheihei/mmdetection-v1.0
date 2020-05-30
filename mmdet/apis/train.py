@@ -353,13 +353,13 @@ def attack_detector(args, model, cfg, dataset):
                 trans_gt_masks = copy.deepcopy(data['gt_masks'])
                 for j in range(0, len(trans_imgs.data)):
                     trans_imgs.data[j].requires_grad = True
-                    if torch.rand((1, 1))[0][0] < 0.7:
-                        original_size = trans_imgs.data[j].size()
-                        resize_ratio = torch.rand((1, 1))[0][0] * 0.1 + 0.9
-                        pad_size_x = original_size[2] - int(resize_ratio * original_size[2])
-                        pad_size_y = original_size[3] - int(resize_ratio * original_size[3])
-                        img_data = []
-                        for k in range(0, original_size[0]):
+                    original_size = trans_imgs.data[j].size()
+                    img_data = []
+                    for k in range(0, original_size[0]):
+                        if torch.rand((1, 1))[0][0] < 0.7:
+                            resize_ratio = torch.rand((1, 1))[0][0] * 0.1 + 0.9
+                            pad_size_x = original_size[2] - int(resize_ratio * original_size[2])
+                            pad_size_y = original_size[3] - int(resize_ratio * original_size[3])
                             size_meta = trans_img_meta.data[j][k]['img_shape']
                             assert size_meta[2] == 3
                             trans_img_meta.data[j][k]['img_shape'] = (int(size_meta[0] * resize_ratio),
@@ -379,6 +379,10 @@ def attack_detector(args, model, cfg, dataset):
                             for channel in range(3):
                                 img_temp[channel] = (img_temp[channel] - norm_cfg['mean'][channel]) \
                                                     / norm_cfg['std'][channel]
+                            img_temp = torch.cat((img_temp,
+                                                  torch.zeros((3, img_temp.size()[1], pad_size_y))), dim=2)
+                            img_temp = torch.cat((img_temp,
+                                                  torch.zeros((3, pad_size_x, img_temp.size()[2]))), dim=1)
                             trans_gt_bboxes.data[j][k] *= resize_ratio
                             img_data.append(img_temp)
                             mask_data = []
@@ -400,16 +404,10 @@ def attack_detector(args, model, cfg, dataset):
                                                    torch.zeros((mask_data.size()[0],
                                                                 pad_size_x, mask_data.size()[2]))), dim=1)
                             trans_gt_masks.data[j][k] = mask_data.numpy().astype(np.uint8)
-                        trans_imgs.data[j] = torch.stack(tuple(img_data), dim=0).cuda()
-                        trans_imgs.data[j] = torch.cat((trans_imgs.data[j],
-                                                        torch.zeros((
-                                                            trans_imgs.data[j].size()[0], 3,
-                                                            trans_imgs.data[j].size()[2], pad_size_y)).cuda()), dim=3)
-                        trans_imgs.data[j] = torch.cat((trans_imgs.data[j],
-                                                        torch.zeros((
-                                                            trans_imgs.data[j].size()[0], 3,
-                                                            pad_size_x, trans_imgs.data[j].size()[3])).cuda()), dim=2)
-                        trans_imgs.data[j].requires_grad = True
+                        else:
+                            img_data.append(trans_imgs.data[j][k].cpu())
+                    trans_imgs.data[j] = torch.stack(tuple(img_data), dim=0).cuda().detach()
+                    trans_imgs.data[j].requires_grad = True
             else:
                 trans_imgs = imgs
                 trans_img_meta = data['img_meta']
