@@ -413,7 +413,9 @@ def attack_detector(args, model, cfg, dataset):
                 trans_img_meta = data['img_meta']
                 trans_gt_bboxes = data['gt_bboxes']
                 trans_gt_labels = data['gt_labels']
-                trans_gt_masks = data['gt_masks']
+                trans_gt_masks = None
+                if with_mask:
+                    trans_gt_masks = data['gt_masks']
             if args.model_name == 'rpn_r50_fpn_1x':
                 result = model(trans_imgs, trans_img_meta, return_loss=True, gt_bboxes=trans_gt_bboxes)
             elif with_mask:
