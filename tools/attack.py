@@ -232,6 +232,13 @@ if __name__ == "__main__":
                          [0, 1, 2],
                          ['Gaussian'],
                          [0, 5, 11, 15]]
+    if args_raw.visualize:
+        search_values = [[16.0],
+                         [['loss_rpn_bbox', 'loss_cls']],
+                         [10],
+                         [1],
+                         ['Gaussian'],
+                         [15]]
     if args_raw.model_name == 'retinanet_r50_fpn_1x':
         search_values[1] = [['loss_cls']]
     # search_values = [[16.0],

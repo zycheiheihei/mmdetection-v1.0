@@ -197,8 +197,8 @@ def imshow_det_bboxes(img,
                       labels,
                       class_names=None,
                       score_thr=0,
-                      thickness=2,
-                      font_scale=1,
+                      thickness=5,
+                      font_scale=2,
                       show=True,
                       win_name='',
                       wait_time=0,
@@ -234,7 +234,7 @@ def imshow_det_bboxes(img,
         labels = labels[inds]
 
     cm = plt.cm.get_cmap('RdYlBu')
-    text_color = (0, 255, 0)
+    text_color = (255, 255, 255)
 
     for bbox, label in zip(bboxes, labels):
         bbox_int = bbox.astype(np.int32)
@@ -249,7 +249,7 @@ def imshow_det_bboxes(img,
         if len(bbox) > 4:
             label_text += '|{:.02f}'.format(bbox[-1])
         cv2.putText(img, label_text, (bbox_int[0], bbox_int[1] - 2),
-                    cv2.FONT_HERSHEY_COMPLEX, font_scale, text_color)
+                    cv2.FONT_HERSHEY_COMPLEX, font_scale, text_color, 3)
 
     if show:
         imshow(img, win_name, wait_time)
