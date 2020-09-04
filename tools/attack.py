@@ -245,7 +245,7 @@ if __name__ == "__main__":
                          [10],
                          [1],
                          ['Gaussian'],
-                         [15]]
+                         [0]]
     if args_raw.model_name == 'retinanet_r50_fpn_1x':
         search_values[1] = [['loss_cls']]
     # search_values = [[16.0],
