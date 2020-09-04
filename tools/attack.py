@@ -267,6 +267,8 @@ if __name__ == "__main__":
         save_file_name = str(datetime.datetime.now()) + '.xlsx'
     else:
         save_file_name = str(datetime.datetime.now()) + '_attack_' + str(args_search.black_box_model_name) + '.xlsx'
+    if args_raw.DAG:
+        save_file_name = save_file_name[:-5] + '_DAG.xlsx'
     loaded_datasets = None
     experiment_index = 0
     for search_value in itertools.product(*search_values):
