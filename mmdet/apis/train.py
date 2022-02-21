@@ -35,25 +35,9 @@ from yolov3.test import test_attack
 
 
 config_pth = '/data/zhangyic/TPAMI/mmdetection/configs/'
-# black_config = [config_pth+'faster_rcnn_r50_fpn_1x_jun9.py', config_pth+'mask_rcnn_r50_fpn_1x_jun9.py', config_pth+'ssd512_coco_jun9.py']
-# black_path = ['/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r50_fpn_1x_20181010-3d1b3351.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_r50_fpn_1x_20181010-069fa190.pth', '/data/zhangyic/TPAMI/mmdetection/weights/ssd512_coco_vgg16_caffe_120e_20181221-d48b0be8.pth']
 
-# black_config = [config_pth+'faster_rcnn_r50_fpn_1x_jun9.py', config_pth+'faster_rcnn_r101_fpn_1x.py', config_pth+'faster_rcnn_x101_64x4d_fpn_1x.py', config_pth+'retinanet_r101_fpn_1x.py']
-# black_path = ['/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r50_fpn_1x_20181010-3d1b3351.pth', '/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r101_fpn_1x_20181129-d1468807.pth', '/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_x101_64x4d_fpn_1x_20181218-c9c69c8f.pth', '/data/zhangyic/TPAMI/mmdetection/weights/retinanet_r101_fpn_1x_coco_20200130-7a93545f.pth']
-
-# black_config = [config_pth+'faster_rcnn_r50_fpn_1x_jun9.py', config_pth+'mask_rcnn_r50_fpn_1x_jun9.py', config_pth+'ssd512_coco_jun9.py', config_pth+'faster_rcnn_r101_fpn_1x.py',config_pth+'faster_rcnn_x101_64x4d_fpn_1x.py', config_pth+'retinanet_r101_fpn_1x.py']
-# black_path = ['/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r50_fpn_1x_20181010-3d1b3351.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_r50_fpn_1x_20181010-069fa190.pth', '/data/zhangyic/TPAMI/mmdetection/weights/ssd512_coco_vgg16_caffe_120e_20181221-d48b0be8.pth',\
-#              '/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r101_fpn_1x_20181129-d1468807.pth','/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_x101_64x4d_fpn_1x_20181218-c9c69c8f.pth', '/data/zhangyic/TPAMI/mmdetection/weights/retinanet_r101_fpn_1x_coco_20200130-7a93545f.pth']
-
-# black_config = [config_pth+'faster_rcnn_x101_64x4d_fpn_1x.py', config_pth+'mask_rcnn_x101_64x4d_fpn_1x.py',config_pth+'retinanet_r101_fpn_1x.py']
-# black_path = ['/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_x101_64x4d_fpn_1x_20181218-c9c69c8f.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_x101_64x4d_fpn_1x_20181218-cb159987.pth' ,'/data/zhangyic/TPAMI/mmdetection/weights/retinanet_r101_fpn_1x_coco_20200130-7a93545f.pth']
-
-# black_config = [config_pth+'faster_rcnn_r50_fpn_1x_jun9.py', config_pth+'mask_rcnn_r50_fpn_1x_jun9.py',config_pth+'faster_rcnn_x101_64x4d_fpn_1x.py', config_pth+'mask_rcnn_x101_64x4d_fpn_1x.py', config_pth+'ssd512_coco_jun9.py', 'yolov3']
-# black_path = [ '/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r50_fpn_1x_20181010-3d1b3351.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_r50_fpn_1x_20181010-069fa190.pth','/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_x101_64x4d_fpn_1x_20181218-c9c69c8f.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_x101_64x4d_fpn_1x_20181218-cb159987.pth' , '/data/zhangyic/TPAMI/mmdetection/weights/ssd512_coco_vgg16_caffe_120e_20181221-d48b0be8.pth', 'yolov3']
-
-black_config = [config_pth+'retinanet_r101_fpn_1x.py']
-black_path = [ '/data/zhangyic/TPAMI/mmdetection/weights/retinanet_r101_fpn_1x_coco_20200130-7a93545f.pth' ]
-
+black_config = [config_pth+'faster_rcnn_r50_fpn_1x_jun9.py', config_pth+'mask_rcnn_r50_fpn_1x_jun9.py',config_pth+'faster_rcnn_x101_64x4d_fpn_1x.py', config_pth+'mask_rcnn_x101_64x4d_fpn_1x.py', config_pth+'ssd512_coco_jun9.py', 'yolov3']
+black_path = [ '/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r50_fpn_1x_20181010-3d1b3351.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_r50_fpn_1x_20181010-069fa190.pth','/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_x101_64x4d_fpn_1x_20181218-c9c69c8f.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_x101_64x4d_fpn_1x_20181218-cb159987.pth' , '/data/zhangyic/TPAMI/mmdetection/weights/ssd512_coco_vgg16_caffe_120e_20181221-d48b0be8.pth', 'yolov3']
 
 class ThreadingWithResult(threading.Thread):
 
@@ -614,7 +598,7 @@ def attack_detector(args, model, cfg, dataset):
             model.zero_grad()
             pbar_inner.update(1)
         
-        for b in range(0):
+        for b in range(5):
             if len(black_path)>1:
                 del infer_model
                 args.black_box_model_path = black_path[b]
@@ -664,7 +648,7 @@ def attack_detector(args, model, cfg, dataset):
 
     black_args = []
     std_args = copy.deepcopy(args)
-    for b in range(0):
+    for b in range(6):
         args = copy.deepcopy(std_args)
         if b<5:
             if not args.target_attack:
