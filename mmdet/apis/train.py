@@ -333,9 +333,9 @@ def attack_detector(args, model, cfg, dataset):
             else:
                 os.remove(os.path.join(args.save_path[:-7], f))
 
-        with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_before_attack_target.txt', mode='w') as f:
+        with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_before_attack.txt', mode='w') as f:
             f.close()
-        with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_under_attack_target.txt', mode='w') as f:
+        with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_under_attack.txt', mode='w') as f:
             f.close()
     class_names = infer_model.CLASSES
     num_of_classes = len(infer_model.CLASSES)
