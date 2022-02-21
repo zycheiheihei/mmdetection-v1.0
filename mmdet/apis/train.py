@@ -13,7 +13,8 @@ from mmdet.datasets import DATASETS, build_dataloader
 from mmdet.models import RPN
 from .env import get_root_logger
 import pdb
-from tools.attack import load_model, visualize_all_images, visualize_all_images_plus_acc, visualize_modification
+from mmdet.apis import set_random_seed
+from tools.attack import load_model, visualize_all_images, visualize_all_images_plus_acc, visualize_modification, generate_data, target_test_all
 import datetime
 import numpy as np
 from tqdm import tqdm
@@ -26,6 +27,32 @@ import scipy.stats as st
 import shutil
 from mmdet.core import eval_map_attack
 import torchvision.transforms as transforms
+import sys
+import random
+sys.path.append('../..')
+sys.path.append('../../yolov3')
+from yolov3.test import test_attack
+
+
+config_pth = '/data/zhangyic/TPAMI/mmdetection/configs/'
+# black_config = [config_pth+'faster_rcnn_r50_fpn_1x_jun9.py', config_pth+'mask_rcnn_r50_fpn_1x_jun9.py', config_pth+'ssd512_coco_jun9.py']
+# black_path = ['/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r50_fpn_1x_20181010-3d1b3351.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_r50_fpn_1x_20181010-069fa190.pth', '/data/zhangyic/TPAMI/mmdetection/weights/ssd512_coco_vgg16_caffe_120e_20181221-d48b0be8.pth']
+
+# black_config = [config_pth+'faster_rcnn_r50_fpn_1x_jun9.py', config_pth+'faster_rcnn_r101_fpn_1x.py', config_pth+'faster_rcnn_x101_64x4d_fpn_1x.py', config_pth+'retinanet_r101_fpn_1x.py']
+# black_path = ['/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r50_fpn_1x_20181010-3d1b3351.pth', '/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r101_fpn_1x_20181129-d1468807.pth', '/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_x101_64x4d_fpn_1x_20181218-c9c69c8f.pth', '/data/zhangyic/TPAMI/mmdetection/weights/retinanet_r101_fpn_1x_coco_20200130-7a93545f.pth']
+
+# black_config = [config_pth+'faster_rcnn_r50_fpn_1x_jun9.py', config_pth+'mask_rcnn_r50_fpn_1x_jun9.py', config_pth+'ssd512_coco_jun9.py', config_pth+'faster_rcnn_r101_fpn_1x.py',config_pth+'faster_rcnn_x101_64x4d_fpn_1x.py', config_pth+'retinanet_r101_fpn_1x.py']
+# black_path = ['/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r50_fpn_1x_20181010-3d1b3351.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_r50_fpn_1x_20181010-069fa190.pth', '/data/zhangyic/TPAMI/mmdetection/weights/ssd512_coco_vgg16_caffe_120e_20181221-d48b0be8.pth',\
+#              '/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r101_fpn_1x_20181129-d1468807.pth','/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_x101_64x4d_fpn_1x_20181218-c9c69c8f.pth', '/data/zhangyic/TPAMI/mmdetection/weights/retinanet_r101_fpn_1x_coco_20200130-7a93545f.pth']
+
+# black_config = [config_pth+'faster_rcnn_x101_64x4d_fpn_1x.py', config_pth+'mask_rcnn_x101_64x4d_fpn_1x.py',config_pth+'retinanet_r101_fpn_1x.py']
+# black_path = ['/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_x101_64x4d_fpn_1x_20181218-c9c69c8f.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_x101_64x4d_fpn_1x_20181218-cb159987.pth' ,'/data/zhangyic/TPAMI/mmdetection/weights/retinanet_r101_fpn_1x_coco_20200130-7a93545f.pth']
+
+# black_config = [config_pth+'faster_rcnn_r50_fpn_1x_jun9.py', config_pth+'mask_rcnn_r50_fpn_1x_jun9.py',config_pth+'faster_rcnn_x101_64x4d_fpn_1x.py', config_pth+'mask_rcnn_x101_64x4d_fpn_1x.py', config_pth+'ssd512_coco_jun9.py', 'yolov3']
+# black_path = [ '/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r50_fpn_1x_20181010-3d1b3351.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_r50_fpn_1x_20181010-069fa190.pth','/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_x101_64x4d_fpn_1x_20181218-c9c69c8f.pth', '/data/zhangyic/TPAMI/mmdetection/weights/mask_rcnn_x101_64x4d_fpn_1x_20181218-cb159987.pth' , '/data/zhangyic/TPAMI/mmdetection/weights/ssd512_coco_vgg16_caffe_120e_20181221-d48b0be8.pth', 'yolov3']
+
+black_config = [config_pth+'retinanet_r101_fpn_1x.py']
+black_path = [ '/data/zhangyic/TPAMI/mmdetection/weights/retinanet_r101_fpn_1x_coco_20200130-7a93545f.pth' ]
 
 
 class ThreadingWithResult(threading.Thread):
@@ -288,6 +315,20 @@ def conv_layer(args):
     return conv
 
 
+def label_permutation():
+    target_label = np.array(range(0,80))
+    # labels should be index+1 in 1-80
+    np.random.shuffle(target_label)
+    def checkPermute(target):
+        for i in range(80):
+            if target[i]==i:
+                return True
+        return False
+    while(checkPermute(target_label)):
+        np.random.shuffle(target_label)
+    target_label = torch.tensor(target_label)
+    return target_label
+
 def attack_detector(args, model, cfg, dataset):
     print(str(datetime.now()) + ' - INFO - GPUs: ', cfg.gpus)
     print(str(datetime.now()) + ' - INFO - Imgs per GPU: ', cfg.data.imgs_per_gpu)
@@ -296,31 +337,64 @@ def attack_detector(args, model, cfg, dataset):
     print(str(datetime.now()) + ' - INFO - Epsilon: ', args.epsilon)
     infer_model = load_model(args)
     attack_loader = build_dataloader(dataset, cfg.data.imgs_per_gpu, cfg.data.workers_per_gpu, cfg.gpus, dist=False)
+    # print(type(attack_loader))
     model = MMDataParallel(model, device_ids=range(cfg.gpus)).cuda()
     if args.clear_output:
-        file_list = os.listdir(args.save_path)
+        file_list = os.listdir(args.save_path[:-7])
         for f in file_list:
-            if os.path.isdir(os.path.join(args.save_path, f)):
-                shutil.rmtree(os.path.join(args.save_path, f))
+            if f[-5:]=='.xlsx':
+                continue
+            if os.path.isdir(os.path.join(args.save_path[:-7], f)):
+                shutil.rmtree(os.path.join(args.save_path[:-7], f))
             else:
-                os.remove(os.path.join(args.save_path, f))
+                os.remove(os.path.join(args.save_path[:-7], f))
+
+        with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_before_attack_target.txt', mode='w') as f:
+            f.close()
+        with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_under_attack_target.txt', mode='w') as f:
+            f.close()
     class_names = infer_model.CLASSES
     num_of_classes = len(infer_model.CLASSES)
-    max_batch = min(attack_loader.__len__(), args.max_attack_batches)
+    max_batch = attack_loader.__len__()
+    max_batch = 25
+    # print(max_batch)
     pbar_outer = tqdm(total=max_batch)
     pbar_inner = tqdm(total=args.num_attack_iter)
     assert max_batch > 0
-    acc_before_attack = 0
-    acc_under_attack = 0
-    statistics = np.zeros(6)
+    acc_before_attack = [0,0,0,0]
+    acc_under_attack = [0,0,0,0]
+    statistics = [np.zeros(6),np.zeros(6),np.zeros(6),np.zeros(6)]
     number_of_images = 0
-    dot_product = 0
+    dot_product = [0,0,0,0]
     conv_kernel = None
     with_mask = hasattr(model.module, 'mask_head') and model.module.mask_head is not None
-    MAP_data = [[[None] * num_of_classes, [None] * num_of_classes], [[None] * num_of_classes, [None] * num_of_classes]]
+    MAP_data = [[[[None] * num_of_classes, [None] * num_of_classes], [[None] * num_of_classes, [None] * num_of_classes]],\
+                [[[None] * num_of_classes, [None] * num_of_classes], [[None] * num_of_classes, [None] * num_of_classes]],\
+                [[[None] * num_of_classes, [None] * num_of_classes], [[None] * num_of_classes, [None] * num_of_classes]],\
+                [[[None] * num_of_classes, [None] * num_of_classes], [[None] * num_of_classes, [None] * num_of_classes]]]
+    targeted_acc_before_attack = [0]*len(black_path)
+    targeted_acc_under_attack = [0]*len(black_path)
+
+    target_label = None
+    if args.DAG:
+        target_label = label_permutation()
+        set_random_seed(args.seed) # ensure the data order is right
     if args.kernel_size != 0:
         conv_kernel = conv_layer(args)
     for i, data in enumerate(attack_loader):
+        #TODO: set the target labels (1-80)
+        if args.target_attack:
+            all_label = set([i for i in range(1,81)])
+            for j in range(0, len(data['gt_labels'].data)):
+                for k in range(0,len(data['gt_labels'].data[j])):
+                    img_label = data['gt_labels'].data[j][k]
+                    label_set = set()
+                    for elem in img_label:
+                        label_set.add(elem)
+                    rest_labels = all_label.difference(label_set)
+                    targeted_label = random.sample(rest_labels,1)
+                    data['gt_labels'].data[j][k]=torch.tensor([targeted_label[0] for i in range(img_label.shape[0])])
+
         epsilon = args.epsilon / max(data['img_meta'].data[0][0]['img_norm_cfg']['std'])
         if i >= max_batch:
             break
@@ -336,6 +410,10 @@ def attack_detector(args, model, cfg, dataset):
                     visualize_modification(args, infer_model, copy.deepcopy(imgs.data[j]), j,
                                            data['img_meta'].data[j], data['gt_bboxes'].data[j],
                                            data['gt_labels'].data[j])
+            if args.generate_data:
+                assert args.model_name != 'rpn_r50_fpn_1x'
+                generate_data(args, copy.deepcopy(imgs.data[j]), False, data['img_meta'].data[j],
+                              data['gt_bboxes'].data[j], data['gt_labels'].data[j])
             imgs.data[j] = imgs.data[j].detach()
             if args.DIM:
                 imgs.data[j].requires_grad = False
@@ -347,16 +425,19 @@ def attack_detector(args, model, cfg, dataset):
         for _ in range(args.num_attack_iter):
             if args.DIM:
                 trans_imgs = copy.deepcopy(imgs)
+                trans_dim_imgs = copy.deepcopy(imgs)
                 trans_img_meta = copy.deepcopy(data['img_meta'])
                 trans_gt_bboxes = copy.deepcopy(data['gt_bboxes'])
                 trans_gt_labels = copy.deepcopy(data['gt_labels'])
-                trans_gt_masks = copy.deepcopy(data['gt_masks'])
+                if with_mask:
+                    trans_gt_masks = copy.deepcopy(data['gt_masks'])
                 for j in range(0, len(trans_imgs.data)):
                     trans_imgs.data[j].requires_grad = True
                     original_size = trans_imgs.data[j].size()
                     img_data = []
                     for k in range(0, original_size[0]):
-                        if torch.rand((1, 1))[0][0] < 0.7:
+                        if torch.rand((1, 1))[0][0] < 0.5:
+                            print("dim resize")
                             resize_ratio = torch.rand((1, 1))[0][0] * 0.1 + 0.9
                             pad_size_x = original_size[2] - int(resize_ratio * original_size[2])
                             pad_size_y = original_size[3] - int(resize_ratio * original_size[3])
@@ -365,6 +446,28 @@ def attack_detector(args, model, cfg, dataset):
                             trans_img_meta.data[j][k]['img_shape'] = (int(size_meta[0] * resize_ratio),
                                                                       int(size_meta[1] * resize_ratio),
                                                                       size_meta[2])
+                            img_temp = trans_imgs.data[j][k]
+                            norm_cfg = trans_img_meta.data[j][k]['img_norm_cfg']
+                            mean_tensor = torch.tensor(norm_cfg['mean']).unsqueeze(0).unsqueeze(-1).unsqueeze(-1).cuda()
+                            std_tensor = torch.tensor(norm_cfg['std']).unsqueeze(0).unsqueeze(-1).unsqueeze(-1).cuda()
+                            unsqueezed_img = img_temp.unsqueeze(0)
+                            reset_img = unsqueezed_img*std_tensor+mean_tensor
+                            img_temp_resized = torch.nn.functional.interpolate(reset_img,(int(resize_ratio * original_size[2]), int(resize_ratio * original_size[3])),mode='nearest')
+                            img_temp_111 = (img_temp_resized-mean_tensor)/std_tensor
+                            pad_x_up = random.randint(0,pad_size_x)
+                            pad_y_up = random.randint(0,pad_size_y)
+                            pad = (pad_y_up, pad_size_y-pad_y_up, pad_x_up, pad_size_x-pad_x_up)
+                            padded_img = torch.nn.functional.pad(img_temp_111, pad,  "constant", value=0)
+                            trans_gt_bboxes.data[j][k] *= resize_ratio
+                            trans_gt_bboxes.data[j][k][:,0]+=pad_y_up
+                            trans_gt_bboxes.data[j][k][:,2]+=pad_y_up
+                            trans_gt_bboxes.data[j][k][:,1]+=pad_x_up
+                            trans_gt_bboxes.data[j][k][:,3]+=pad_x_up
+                            # 0,2 add pad_y_up, 1,3 add pad_x_up
+                            img_data.append(padded_img[0])
+                            # exit(0)
+                            continue
+                            
                             transform = transforms.Compose([
                                 transforms.Scale(
                                     (int(resize_ratio * original_size[2]), int(resize_ratio * original_size[3]))),
@@ -385,29 +488,31 @@ def attack_detector(args, model, cfg, dataset):
                                                   torch.zeros((3, pad_size_x, img_temp.size()[2]))), dim=1)
                             trans_gt_bboxes.data[j][k] *= resize_ratio
                             img_data.append(img_temp)
-                            mask_data = []
-                            for l in range(np.shape(trans_gt_masks.data[j][k])[0]):
-                                transform_mask = transforms.Compose([
-                                    transforms.Scale((int(resize_ratio * original_size[2]),
-                                                      int(resize_ratio * original_size[3]))),
-                                    transforms.ToTensor(),
-                                ])
-                                mask_temp = transform_mask(transforms.ToPILImage()(trans_gt_masks.data[j][k][l]))
-                                mask_temp = torch.where(mask_temp > 0, torch.ones_like(mask_temp),
-                                                        torch.zeros_like(mask_temp))
-                                mask_data.append(mask_temp)
-                            mask_data = torch.cat(tuple(mask_data), dim=0)
-                            mask_data = torch.cat((mask_data,
-                                                   torch.zeros((mask_data.size()[0],
-                                                                mask_data.size()[1], pad_size_y))), dim=2)
-                            mask_data = torch.cat((mask_data,
-                                                   torch.zeros((mask_data.size()[0],
-                                                                pad_size_x, mask_data.size()[2]))), dim=1)
-                            trans_gt_masks.data[j][k] = mask_data.numpy().astype(np.uint8)
+                            if with_mask:
+                                mask_data = []
+                                for l in range(np.shape(trans_gt_masks.data[j][k])[0]):
+                                    transform_mask = transforms.Compose([
+                                        transforms.Scale((int(resize_ratio * original_size[2]),
+                                                        int(resize_ratio * original_size[3]))),
+                                        transforms.ToTensor(),
+                                    ])
+                                    mask_temp = transform_mask(transforms.ToPILImage()(trans_gt_masks.data[j][k][l]))
+                                    mask_temp = torch.where(mask_temp > 0, torch.ones_like(mask_temp),
+                                                            torch.zeros_like(mask_temp))
+                                    mask_data.append(mask_temp)
+                                mask_data = torch.cat(tuple(mask_data), dim=0)
+                                mask_data = torch.cat((mask_data,
+                                                    torch.zeros((mask_data.size()[0],
+                                                                    mask_data.size()[1], pad_size_y))), dim=2)
+                                mask_data = torch.cat((mask_data,
+                                                    torch.zeros((mask_data.size()[0],
+                                                                    pad_size_x, mask_data.size()[2]))), dim=1)
+                                trans_gt_masks.data[j][k] = mask_data.numpy().astype(np.uint8)
                         else:
-                            img_data.append(trans_imgs.data[j][k].cpu())
-                    trans_imgs.data[j] = torch.stack(tuple(img_data), dim=0).cuda().detach()
-                    trans_imgs.data[j].requires_grad = True
+                            img_data.append(trans_imgs.data[j][k])
+                    # trans_dim_imgs.data[j] = torch.stack(tuple(img_data), dim=0).cuda().detach()
+                    # trans_imgs.data[j].requires_grad = True
+                    trans_dim_imgs.data[j] = torch.stack(tuple(img_data),dim=0)
             else:
                 trans_imgs = imgs
                 trans_img_meta = data['img_meta']
@@ -416,23 +521,51 @@ def attack_detector(args, model, cfg, dataset):
                 trans_gt_masks = None
                 if with_mask:
                     trans_gt_masks = data['gt_masks']
+
+            if args.DAG:
+                permuted_labels = copy.deepcopy(trans_gt_labels)
+                for j in range(len(trans_gt_labels.data)):
+                    for k in range(len(trans_gt_labels.data[j])):
+                        for s in range(trans_gt_labels.data[j][k].shape[0]):
+                            permuted_labels.data[j][k][s] = target_label[trans_gt_labels.data[j][k][s]-1]+1
+                
+                trans_gt_labels = [trans_gt_labels, permuted_labels]
+
             if args.model_name == 'rpn_r50_fpn_1x':
                 result = model(trans_imgs, trans_img_meta, return_loss=True, gt_bboxes=trans_gt_bboxes)
             elif with_mask:
                 result = model(trans_imgs, trans_img_meta, return_loss=True, gt_bboxes=trans_gt_bboxes,
                                gt_labels=trans_gt_labels, gt_masks=trans_gt_masks)
+            elif args.DIM:
+                print("dim forward")
+                result = model(trans_dim_imgs, trans_img_meta, return_loss=True,
+                               gt_bboxes=trans_gt_bboxes, gt_labels=trans_gt_labels)
             else:
                 result = model(trans_imgs, trans_img_meta, return_loss=True,
                                gt_bboxes=trans_gt_bboxes, gt_labels=trans_gt_labels)
             loss = 0
-            for key in args.loss_keys:
-                if type(result[key]) is list:
-                    for losses in result[key]:
-                        loss += losses.sum()
-                else:
-                    loss += result[key].sum()
+            if args.target_attack:
+                for key in args.loss_keys:
+                    if type(result[key]) is list:
+                        for losses in result[key]:
+                            loss -= losses.sum()
+                    else:
+                        loss -= result[key].sum()
+            else:
+                for key in args.loss_keys:
+                    if type(result[key]) is list:
+                        for losses in result[key]:
+                            loss += losses.sum()
+                    else:
+                        loss += result[key].sum()
             loss.backward()
             for j in range(0, len(imgs.data)):
+                # if args.DAG:
+                #     update_direction = trans_imgs.data[j].grad
+                #     linf_per_img = torch.norm(update_direction, float('inf'), dim=(1,2,3), keepdim=True)
+                #     update_direction = update_direction/linf_per_img
+                #     imgs.data[j] = imgs.data[j] + epsilon / args.\
+                #         num_attack_iter * update_direction
                 if args.momentum == 0:
                     update_direction = trans_imgs.data[j].grad
                     if conv_kernel:
@@ -480,71 +613,129 @@ def attack_detector(args, model, cfg, dataset):
                 last_update_direction[j] = update_direction
             model.zero_grad()
             pbar_inner.update(1)
-        for j in range(0, cfg.gpus):
-            if args.model_name == 'rpn_r50_fpn_1x':
-                t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
-                                                                             imgs.data[j], raw_imgs.data[j],
-                                                                             data['img_meta'].data[j],
-                                                                             data['gt_bboxes'].data[j],
-                                                                             MAP_data))
+        
+        for b in range(0):
+            if len(black_path)>1:
+                del infer_model
+                args.black_box_model_path = black_path[b]
+                args.config_black_box = black_config[b]
+                infer_model = load_model(args)
+            if not args.target_attack:
+                for j in range(0, len(imgs.data)):
+                    if args.model_name == 'rpn_r50_fpn_1x':
+                        t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
+                                                                                    imgs.data[j], raw_imgs.data[j],
+                                                                                    data['img_meta'].data[j],
+                                                                                    data['gt_bboxes'].data[j],
+                                                                                    MAP_data[b]))
+                    else:
+                        t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
+                                                                                    imgs.data[j], raw_imgs.data[j],
+                                                                                    data['img_meta'].data[j],
+                                                                                    data['gt_bboxes'].data[j],
+                                                                                    MAP_data[b],
+                                                                                    data['gt_labels'].data[j]))
+                    t.start()
+                    t.join()
+                    statistics_result = t.get_result()
+                    if statistics_result[0][0] >= 0:
+                        statistics[b] += statistics_result[0]
+                        MAP_data[b] = statistics_result[1]
+                    else:
+                        print("Error! Results were not fetched!")
             else:
-                t = ThreadingWithResult(visualize_all_images_plus_acc, args=(args, infer_model,
-                                                                             imgs.data[j], raw_imgs.data[j],
-                                                                             data['img_meta'].data[j],
-                                                                             data['gt_bboxes'].data[j],
-                                                                             MAP_data,
-                                                                             data['gt_labels'].data[j]))
-            t.start()
-            t.join()
-            statistics_result = t.get_result()
-            if statistics_result[0][0] >= 0:
-                statistics += statistics_result[0]
-                MAP_data = statistics_result[1]
-            else:
-                print("Error! Results were not fetched!")
+                #TODO: test
+                raw_targeted_acc, attack_targeted_acc = target_test_all(args, infer_model, imgs.data[j], raw_imgs.data[j],
+                                                                                    data['img_meta'].data[j],
+                                                                                    data['gt_bboxes'].data[j],
+                                                                                    data['gt_labels'].data[j])
+                targeted_acc_before_attack[b] += raw_targeted_acc
+                targeted_acc_under_attack[b] += attack_targeted_acc
+        
+        if args.generate_data:
+            for j in range(0, len(imgs.data)):
+                generate_data(args, copy.deepcopy(imgs.data[j]), True, data['img_meta'].data[j],
+                            data['gt_bboxes'].data[j], data['gt_labels'].data[j])
+        
         pbar_outer.update(1)
     pbar_outer.close()
     pbar_inner.close()
-    if args.visualize and args.num_attack_iter > 1:
-        dot_product /= (args.num_attack_iter - 1) * number_of_images / args.imgs_per_gpu
-        print("average normalized dot product = ", dot_product)
-    acc_before_attack /= max_batch
-    acc_under_attack /= max_batch
-    statistics /= number_of_images
 
-    if args.neglect_raw_stat and args.experiment_index > args.resume_experiment:
-        pass
-    else:
-        args.class_accuracy_before_attack = 100 * statistics[0]
-        args.IoU_accuracy_before_attack = 100 * statistics[1]
-        args.IoU_accuracy_before_attack2 = 100 * statistics[2]
-        if MAP_data[0] is None:
-            args.MAP_before_attack = 0
+
+    black_args = []
+    std_args = copy.deepcopy(args)
+    for b in range(0):
+        args = copy.deepcopy(std_args)
+        if b<5:
+            if not args.target_attack:
+                if args.visualize and args.num_attack_iter > 1:
+                    dot_product[b] /= (args.num_attack_iter - 1) * number_of_images / args.imgs_per_gpu
+                    print("average normalized dot product = ", dot_product[b])
+                acc_before_attack[b] /= max_batch
+                acc_under_attack[b] /= max_batch
+                statistics[b] /= number_of_images
+
+                print("Test on {}".format(black_config[b]))
+
+                if args.neglect_raw_stat and args.experiment_index > args.resume_experiment:
+                    pass
+                else:
+                    args.class_accuracy_before_attack = 100 * statistics[b][0]
+                    args.IoU_accuracy_before_attack = 100 * statistics[b][1]
+                    args.IoU_accuracy_before_attack2 = 100 * statistics[b][2]
+                    if MAP_data[b][0] is None:
+                        args.MAP_before_attack = 0
+                    else:
+                        args.MAP_before_attack = eval_map_attack(MAP_data[b][0][0], MAP_data[b][0][1], len(class_names),
+                                                                scale_ranges=None, iou_thr=0.5,
+                                                                dataset=class_names, print_summary=True)[0]
+                args.class_accuracy_under_attack = 100 * statistics[b][3]
+                args.IoU_accuracy_under_attack = 100 * statistics[b][4]
+                args.IoU_accuracy_under_attack2 = 100 * statistics[b][5]
+                if MAP_data[b][1] is None:
+                    args.MAP_under_attack = 0
+                else:
+                    args.MAP_under_attack = eval_map_attack(MAP_data[b][1][0], MAP_data[b][1][1], len(class_names),
+                                                            scale_ranges=None, iou_thr=0.5,
+                                                            dataset=class_names, print_summary=True)[0]
+            else:
+                print("Test on {}".format(black_config[b]))
+                if args.neglect_raw_stat and args.experiment_index > args.resume_experiment:
+                    pass
+                else:
+                    args.targeted_accuracy_before_attack = targeted_acc_before_attack[b]/number_of_images
+                args.targeted_accuracy_under_attack = targeted_acc_under_attack[b]/number_of_images
+
         else:
-            args.MAP_before_attack = eval_map_attack(MAP_data[0][0], MAP_data[0][1], len(class_names),
-                                                     scale_ranges=None, iou_thr=0.5,
-                                                     dataset=class_names, print_summary=True)[0]
-    args.class_accuracy_under_attack = 100 * statistics[3]
-    args.IoU_accuracy_under_attack = 100 * statistics[4]
-    args.IoU_accuracy_under_attack2 = 100 * statistics[5]
-    if MAP_data[1] is None:
-        args.MAP_under_attack = 0
-    else:
-        args.MAP_under_attack = eval_map_attack(MAP_data[1][0], MAP_data[1][1], len(class_names),
-                                                scale_ranges=None, iou_thr=0.5,
-                                                dataset=class_names, print_summary=True)[0]
-    args.class_accuracy_decrease = args.class_accuracy_before_attack - args.class_accuracy_under_attack
-    args.IoU_accuracy_decrease = args.IoU_accuracy_before_attack - args.IoU_accuracy_under_attack
-    args.IoU_accuracy_decrease2 = args.IoU_accuracy_before_attack2 - args.IoU_accuracy_under_attack2
-    args.MAP_decrease = 100 * (args.MAP_before_attack - args.MAP_under_attack)
-    print("Class & IoU accuracy before attack = %g %g" % (args.class_accuracy_before_attack,
-                                                          args.IoU_accuracy_before_attack))
-    print("Class & IoU accuracy under attack = %g %g" % (args.class_accuracy_under_attack,
-                                                         args.IoU_accuracy_under_attack))
-    print("Class & IoU accuracy decrease = %g %g" % (args.class_accuracy_decrease,
-                                                     args.IoU_accuracy_decrease))
-    print("MAP before attack = %g" % args.MAP_before_attack)
-    print("MAP under attack = %g" % args.MAP_under_attack)
-    print("MAP decrease = %g" % args.MAP_decrease)
+            print("Test on Yolov3")
+            if args.generate_data:
+                if not args.target_attack:
+                    args.MAP_before_attack, args.class_accuracy_before_attack, args.IoU_accuracy_before_attack,\
+                            args.IoU_accuracy_before_attack2 = test_attack(False)
+
+                    args.MAP_under_attack, args.class_accuracy_under_attack\
+                        , args.IoU_accuracy_under_attack, args.IoU_accuracy_under_attack2 = test_attack()
+                else:
+                    args.targeted_accuracy_before_attack = test_attack(False)
+                    args.targeted_accuracy_under_attack = test_attack()
+                    
+
+        if not args.target_attack:
+            args.class_accuracy_decrease = args.class_accuracy_before_attack - args.class_accuracy_under_attack
+            args.IoU_accuracy_decrease = args.IoU_accuracy_before_attack - args.IoU_accuracy_under_attack
+            args.IoU_accuracy_decrease2 = args.IoU_accuracy_before_attack2 - args.IoU_accuracy_under_attack2
+            args.MAP_decrease = 100 * (args.MAP_before_attack - args.MAP_under_attack)
+            print("Class & IoU accuracy before attack = %g %g" % (args.class_accuracy_before_attack,
+                                                                args.IoU_accuracy_before_attack))
+            print("Class & IoU accuracy under attack = %g %g" % (args.class_accuracy_under_attack,
+                                                                args.IoU_accuracy_under_attack))
+            print("Class & IoU accuracy decrease = %g %g" % (args.class_accuracy_decrease,
+                                                            args.IoU_accuracy_decrease))
+            print("MAP before attack = %g" % args.MAP_before_attack)
+            print("MAP under attack = %g" % args.MAP_under_attack)
+            print("MAP decrease = %g" % args.MAP_decrease)
+        else:
+            print("Targeted Attack Successful Rate before / after = %g, %g"%(args.targeted_accuracy_before_attack, args.targeted_accuracy_under_attack))
+        black_args.append(args)
     # torch.cuda.empty_cache()
-    return args
+    return black_args

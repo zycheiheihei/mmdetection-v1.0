@@ -437,3 +437,115 @@ def show_result_pyplot(img,
         img, result, class_names, score_thr=score_thr, show=False)
     plt.figure(figsize=fig_size)
     plt.imshow(mmcv.bgr2rgb(img))
+
+
+def test_acc(img, result, class_names, gt_bboxes, gt_labels,
+                         score_thr=0.3, wait_time=0, show=True, out_file=None):
+    #TODO: acc calculation, maybe map_data is not useful
+    """Visualize the detection results on the image.
+
+    Args:
+        img (str or np.ndarray): Image filename or loaded image.
+        result (tuple[list] or list): The detection result, can be either
+            (bbox, segm) or just bbox.
+        class_names (list[str] or tuple[str]): A list of class names.
+        gt_bboxes: ground truth (bboxes).
+        gt_labels: ground truth (labels).
+        map_data: data for map.
+        score_thr (float): The threshold to visualize the bboxes and masks.
+        wait_time (int): Value of waitKey param.
+        show (bool, optional): Whether to show the image with opencv or not.
+        out_file (str, optional): If specified, the visualization result will
+            be written to the out file instead of shown in a window.
+
+    Returns:
+        np.ndarray or None: If neither `show` nor `out_file` is specified, the
+            visualized image is returned, otherwise None is returned.
+    """
+    assert isinstance(class_names, (tuple, list))
+    img = mmcv.imread(img)
+    img = img.copy()
+    if isinstance(result, tuple):
+        bbox_result, segm_result = result
+    else:
+        bbox_result, segm_result = result, None
+    bboxes = np.vstack(bbox_result)
+    # draw segmentation masks
+    if segm_result is not None:
+        segms = mmcv.concat_list(segm_result)
+        inds = np.where(bboxes[:, -1] > score_thr)[0]
+        for i in inds:
+            color_mask = np.random.randint(0, 256, (1, 3), dtype=np.uint8)
+            mask = maskUtils.decode(segms[i]).astype(np.bool)
+            img[mask] = img[mask] * 0.5 + color_mask * 0.5
+    # draw bounding boxes
+    labels = [
+        np.full(bbox.shape[0], i, dtype=np.int32)
+        for i, bbox in enumerate(bbox_result)
+    ]
+    labels = np.concatenate(labels)
+    gt_bboxes = torch.cat((gt_bboxes, torch.ones(gt_bboxes.size()[0], 1)), 1).numpy()
+    if type(gt_labels) is int:
+        if out_file:
+            gt_labels = np.array([0] * len(gt_bboxes))
+            labels = np.array([0] * len(bboxes))
+            imshow_det_bboxes(
+                img.copy(),
+                gt_bboxes,
+                gt_labels,
+                class_names=class_names,
+                score_thr=score_thr,
+                show=show,
+                wait_time=wait_time,
+                out_file=out_file + '_gt.jpg')
+            imshow_det_bboxes(
+                img,
+                bboxes,
+                labels,
+                class_names=class_names,
+                score_thr=score_thr,
+                show=show,
+                wait_time=wait_time,
+                out_file=out_file + '.jpg')
+        indexes = np.where(bboxes[:, -1] > score_thr)[0]
+        bboxes = bboxes[indexes]
+        map_iou = []
+        for i in range(0, len(gt_bboxes)):
+            match_index, max_iou = iou_vector(bboxes, gt_bboxes[i])
+            if match_index > -1:
+                map_iou.append(max_iou)
+            else:
+                map_iou.append(0)
+        return 0, float(sum(map_iou)) / len(map_iou), 0, None
+    else:
+        gt_labels = gt_labels.numpy() - 1
+    if out_file:
+        imshow_det_bboxes(
+            img.copy(),
+            gt_bboxes,
+            gt_labels,
+            class_names=class_names,
+            score_thr=score_thr,
+            show=show,
+            wait_time=wait_time,
+            out_file=out_file + '_gt.jpg')
+        imshow_det_bboxes(
+            img,
+            bboxes,
+            labels,
+            class_names=class_names,
+            score_thr=score_thr,
+            show=show,
+            wait_time=wait_time,
+            out_file=out_file + '.jpg')
+    indexes = np.where(bboxes[:, -1] > score_thr)[0]
+    bboxes = bboxes[indexes]
+    labels = labels[indexes]
+
+    for i in range(0, len(gt_labels)):
+        match_index, max_iou = iou_vector(bboxes, gt_bboxes[i])
+        if match_index > -1:
+            if labels[match_index] == gt_labels[i]:
+                return 1
+    
+    return 0

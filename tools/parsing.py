@@ -4,7 +4,7 @@ import os
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
-    parser.add_argument('--config', help='train config file path', default='/home/fengyao/mmdetection/configs/')
+    parser.add_argument('--config', help='train config file path', default='/data/zhangyic/TPAMI/mmdetection/configs/')
     parser.add_argument('--work_dir', help='the dir to save logs and models')
     parser.add_argument(
         '--resume_from', help='the checkpoint file to resume from')
@@ -30,30 +30,32 @@ def parse_args():
         '--autoscale-lr',
         action='store_true',
         help='automatically scale lr with the number of gpus')
-    parser.add_argument('--model_name', help='name of loaded model', default='mask_rcnn_r50_fpn_1x')
+    parser.add_argument('--model_name', help='name of loaded model', default='faster_rcnn_r50_fpn_1x')
     parser.add_argument('--train', action='store_true', help='whether or not to train')
     parser.add_argument('--visualize', action='store_true', help='whether or not visualize modification')
     parser.add_argument('--clear_output', action='store_true', help='whether or not to clear output path')
     parser.add_argument('--neglect_raw_stat', action='store_true', help='whether or not to neglect stat '
                                                                         'calculation of raw data')
-    parser.add_argument('--model_path', type=str, default=None)
+    parser.add_argument('--model_path', type=str, default='/data/zhangyic/TPAMI/mmdetection/weights/faster_rcnn_r50_fpn_1x_20181010-3d1b3351.pth')
     parser.add_argument('--DIM', action='store_true', default=False, help='whether or not to use DIM')
     parser.add_argument('--DAG', action='store_true', default=False, help='whether or not to use DAG')
-    parser.add_argument('--black_box_model_path', type=str, default=None)
-    parser.add_argument('--black_box_model_name', type=str, default=None)
+    parser.add_argument('--black_box_model_path', type=str, default='/data/zhangyic/TPAMI/mmdetection/weights/retinanet_r101_fpn_1x_coco_20200130-7a93545f.pth')
+    parser.add_argument('--black_box_model_name', type=str, default='retinanet_r101_fpn_1x')
     parser.add_argument('--num_attack_iter', type=int, default=5)
     parser.add_argument('--epsilon', type=float, default=5.0)
     parser.add_argument('--momentum', type=float, default=0.0)
     parser.add_argument('--save_ratio', type=float, default=0.03)
-    parser.add_argument('--imgs_per_gpu', type=int, default=4)
+    parser.add_argument('--imgs_per_gpu', type=int, default=3)
     parser.add_argument('--workers_per_gpu', type=int, default=0)
     parser.add_argument('--kernel', type=str, default="Gaussian")
     parser.add_argument('--kernel_size', type=int, default=0)
     parser.add_argument('--resume_experiment', type=int, default=0)
+    parser.add_argument('--generate_data', action='store_true', help='whether or not to generate data')
+    parser.add_argument('--target_attack', action='store_true', help='whether or not to target_attack')
     args = parser.parse_args()
     if args.black_box_model_name is None:
         args.black_box_model_name = args.model_name
-    args.config_black_box = args.config + args.black_box_model_name + '_jun9.py'
+    args.config_black_box = args.config + args.black_box_model_name + '.py'
     args.config += args.model_name + '_jun9.py'
     if args.DAG:
         args.config = args.config[:-3] + '_DAG.py'

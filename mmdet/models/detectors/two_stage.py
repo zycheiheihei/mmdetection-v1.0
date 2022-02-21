@@ -165,7 +165,14 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
         """
         x = self.extract_feat(img)
 
+        dag = False
         losses = dict()
+        if isinstance(gt_labels[0],list):
+            # print("It's a List")
+            gt_labels_list = gt_labels
+            dag = True
+        else:
+            gt_labels_list = [gt_labels]
 
         # RPN forward and loss
         if self.with_rpn:
@@ -184,44 +191,54 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
             proposal_list = proposals
 
         # assign gts and sample proposals
-        if self.with_bbox or self.with_mask:
-            bbox_assigner = build_assigner(self.train_cfg.rcnn.assigner)
-            bbox_sampler = build_sampler(
-                self.train_cfg.rcnn.sampler, context=self)
-            num_imgs = img.size(0)
-            if gt_bboxes_ignore is None:
-                gt_bboxes_ignore = [None for _ in range(num_imgs)]
-            sampling_results = []
-            for i in range(num_imgs):
-                assign_result = bbox_assigner.assign(proposal_list[i],
-                                                     gt_bboxes[i],
-                                                     gt_bboxes_ignore[i],
-                                                     gt_labels[i])
-                sampling_result = bbox_sampler.sample(
-                    assign_result,
-                    proposal_list[i],
-                    gt_bboxes[i],
-                    gt_labels[i],
-                    feats=[lvl_feat[i][None] for lvl_feat in x])
-                sampling_results.append(sampling_result)
+        for l in range(len(gt_labels_list)):
+            if self.with_bbox or self.with_mask:
+                bbox_assigner = build_assigner(self.train_cfg.rcnn.assigner)
+                bbox_sampler = build_sampler(
+                    self.train_cfg.rcnn.sampler, context=self)
+                num_imgs = img.size(0)
+                if gt_bboxes_ignore is None:
+                    gt_bboxes_ignore = [None for _ in range(num_imgs)]
+                sampling_results = []
+                for i in range(num_imgs):
+                    assign_result = bbox_assigner.assign(proposal_list[i],
+                                                        gt_bboxes[i],
+                                                        gt_bboxes_ignore[i],
+                                                        gt_labels_list[l][i])
+                    sampling_result = bbox_sampler.sample(
+                        assign_result,
+                        proposal_list[i],
+                        gt_bboxes[i],
+                        gt_labels_list[l][i],
+                        feats=[lvl_feat[i][None] for lvl_feat in x])
+                    sampling_results.append(sampling_result)
 
-        # bbox head forward and loss
-        if self.with_bbox:
-            rois = bbox2roi([res.bboxes for res in sampling_results])
-            # TODO: a more flexible way to decide which feature maps to use
-            bbox_feats = self.bbox_roi_extractor(
-                x[:self.bbox_roi_extractor.num_inputs], rois)
-            if self.with_shared_head:
-                bbox_feats = self.shared_head(bbox_feats)
-            cls_score, bbox_pred = self.bbox_head(bbox_feats)
+            # bbox head forward and loss
+            if self.with_bbox:
+                rois = bbox2roi([res.bboxes for res in sampling_results])
+                # TODO: a more flexible way to decide which feature maps to use
+                bbox_feats = self.bbox_roi_extractor(
+                    x[:self.bbox_roi_extractor.num_inputs], rois)
+                if self.with_shared_head:
+                    bbox_feats = self.shared_head(bbox_feats)
+                cls_score, bbox_pred = self.bbox_head(bbox_feats)
 
-            bbox_targets = self.bbox_head.get_target(sampling_results,
-                                                     gt_bboxes, gt_labels,
-                                                     self.train_cfg.rcnn)
-            loss_bbox = self.bbox_head.loss(cls_score, bbox_pred,
-                                            *bbox_targets)
-            losses.update(loss_bbox)
-
+                bbox_targets = self.bbox_head.get_target(sampling_results,
+                                                        gt_bboxes, gt_labels_list[l],
+                                                        self.train_cfg.rcnn)
+                loss_bbox = self.bbox_head.loss(cls_score, bbox_pred,
+                                                *bbox_targets)
+                if not dag:
+                    losses.update(loss_bbox)
+                else:
+                    keys = loss_bbox.keys()
+                    for k in keys:
+                        if l == 1:
+                            loss_bbox[k+'_'+str(l)] = -1*loss_bbox.pop(k)
+                        else:
+                            loss_bbox[k+'_'+str(l)] = loss_bbox.pop(k)
+                    losses.update(loss_bbox)
+        
         # mask head forward and loss
         if self.with_mask:
             if not self.share_roi_extractor:

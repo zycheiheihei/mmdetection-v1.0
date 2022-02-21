@@ -49,7 +49,7 @@ train_cfg = dict(
     rpn=dict(
         assigner=dict(
             type='MaxIoUAssigner',
-            pos_iou_thr=0.9,
+            pos_iou_thr=0.7,
             neg_iou_thr=0.3,
             min_pos_iou=0.3,
             ignore_iof_thr=-1),
@@ -67,7 +67,7 @@ train_cfg = dict(
         nms_pre=2000,
         nms_post=2000,
         max_num=2000,
-        nms_thr=0.7,
+        nms_thr=0.9,
         min_bbox_size=0),
     rcnn=dict(
         assigner=dict(
@@ -99,7 +99,7 @@ test_cfg = dict(
 )
 # dataset settings
 dataset_type = 'CocoDataset'
-data_root = '/raid/fengyao/MSCOCO2017dataset'
+data_root = '/data/zhangyic/MSCOCO2017'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
@@ -139,7 +139,7 @@ data = dict(
         type=dataset_type,
         ann_file=data_root + '/val/annotations/instances_val2017.json',
         img_prefix=data_root + '/val/val2017/',
-        pipeline=test_pipeline),
+        pipeline=train_pipeline),
     test=dict(
         type=dataset_type,
         ann_file=data_root + '/val/annotations/instances_val2017.json',

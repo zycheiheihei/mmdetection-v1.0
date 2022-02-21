@@ -6,7 +6,7 @@ import torch
 from mmcv import Config
 from parsing import parse_args
 from train import *
-from mmdet.apis import init_detector, inference_detector, show_result, show_result_plus_acc
+from mmdet.apis import init_detector, inference_detector, show_result, show_result_plus_acc, test_acc
 from mmdet.apis import get_root_logger, init_dist, set_random_seed
 from mmdet.apis.train import *
 import pdb
@@ -21,7 +21,10 @@ import datetime
 import itertools
 import mmcv
 from mmcv.runner import load_checkpoint
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "3,4"
 
 def load_model(args):
     if args.train:
@@ -32,6 +35,7 @@ def load_model(args):
             print('Model path missing!')
             return
         if args.black_box_model_path is not None:
+            # print(args.black_box_model_path)
             model = init_detector(args.config_black_box, args.black_box_model_path, device='cuda:0')
         else:
             model = init_detector(args.config, args.model_path, device='cuda:0')
@@ -72,6 +76,77 @@ def visualize_modification(args, model, imgs, index, metadata, gt_bboxes, gt_lab
                              out_file=save_path)
         # show_result(imgs[img_index], result, model.CLASSES, show=False, out_file=save_path)
         # mmcv.imwrite(img, save_path)
+
+
+def generate_data(args, imgs, is_attack, metadata, gt_bboxes, gt_labels=None):
+    print("generate_data!!!")
+    imgs = imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
+    num_of_imgs = imgs.size()[0]
+    imgs = imgs.detach().cpu().numpy()
+    for img_index in range(num_of_imgs):
+        img_mean = metadata[img_index]['img_norm_cfg']['mean'][::-1]
+        img_std = metadata[img_index]['img_norm_cfg']['std'][::-1]
+        imgs[img_index] = imgs[img_index] * img_std + img_mean
+        height, width, _ = np.shape(imgs[img_index])
+        org_height, org_width, _ = metadata[img_index]['img_shape']
+        if is_attack:
+            if not os.path.exists(args.save_path[:-7] + 'images/attack'):
+                os.makedirs(args.save_path[:-7] + 'images/attack')
+            save_path = args.save_path[:-7] + 'images/attack/' + metadata[img_index]['filename'][-16:].split('.')[0]+'.png'
+        else:
+            with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_before_attack_target.txt', mode='a') as f:
+                f.writelines('/data/zhangyic/TPAMI/mmdetection/tools/' + args.save_path[:-7] + 'images/original'
+                            + '/' + metadata[img_index]['filename'][-16:].split('.')[0]+'.png')
+                f.writelines('\n')
+            with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_under_attack_target.txt', mode='a') as f:
+                f.writelines('/data/zhangyic/TPAMI/mmdetection/tools/' + args.save_path[:-7] + 'images/attack'
+                            + '/' + metadata[img_index]['filename'][-16:].split('.')[0]+'.png')
+                f.writelines('\n')
+            if not os.path.exists(args.save_path[:-7] + 'images/original'):
+                os.makedirs(args.save_path[:-7] + 'images/original')
+            save_path = args.save_path[:-7] + 'images/original/' + metadata[img_index]['filename'][-16:].split('.')[0]+'.png'
+            if not os.path.exists(args.save_path[:-7] + 'labels/original'):
+                os.makedirs(args.save_path[:-7] + 'labels/original')
+            file_handle = open(args.save_path[:-7] + 'labels/original/' + metadata[img_index]['filename'][-16:-4] +
+                               '.txt', mode='w')
+            for label_index in range(gt_bboxes[img_index].size()[0]):
+                assert gt_labels[img_index][label_index] >= 1
+                assert gt_labels[img_index][label_index] <= 80
+                file_handle.writelines(str(int(gt_labels[img_index][label_index] - 1)) + ' ')
+                file_handle.writelines(str(float((gt_bboxes[img_index][label_index][0] +
+                                                  gt_bboxes[img_index][label_index][2]) / (2 * width))) + ' ')
+                file_handle.writelines(str(float((gt_bboxes[img_index][label_index][1] +
+                                                  gt_bboxes[img_index][label_index][3]) / (2 * height))) + ' ')
+                file_handle.writelines(str(float((gt_bboxes[img_index][label_index][2] -
+                                                  gt_bboxes[img_index][label_index][0]) / width)) + ' ')
+                file_handle.writelines(str(float((gt_bboxes[img_index][label_index][3] -
+                                                  gt_bboxes[img_index][label_index][1]) / height)) + ' ')
+                file_handle.writelines('\n')
+            file_handle.close()
+
+            if not os.path.exists(args.save_path[:-7] + 'labels/attack'):
+                os.makedirs(args.save_path[:-7] + 'labels/attack')
+            file_handle = open(args.save_path[:-7] + 'labels/attack/' + metadata[img_index]['filename'][-16:-4] +
+                               '.txt', mode='w')
+            for label_index in range(gt_bboxes[img_index].size()[0]):
+                assert gt_labels[img_index][label_index] >= 1
+                assert gt_labels[img_index][label_index] <= 80
+                file_handle.writelines(str(int(gt_labels[img_index][label_index] - 1)) + ' ')
+                file_handle.writelines(str(float((gt_bboxes[img_index][label_index][0] +
+                                                  gt_bboxes[img_index][label_index][2]) / (2 * width))) + ' ')
+                file_handle.writelines(str(float((gt_bboxes[img_index][label_index][1] +
+                                                  gt_bboxes[img_index][label_index][3]) / (2 * height))) + ' ')
+                file_handle.writelines(str(float((gt_bboxes[img_index][label_index][2] -
+                                                  gt_bboxes[img_index][label_index][0]) / width)) + ' ')
+                file_handle.writelines(str(float((gt_bboxes[img_index][label_index][3] -
+                                                  gt_bboxes[img_index][label_index][1]) / height)) + ' ')
+                file_handle.writelines('\n')
+            file_handle.close()
+
+            
+        img = mmcv.imread(imgs[img_index])
+        mmcv.imwrite(img[:org_height,:org_width,:], save_path)
+
 
 
 def visualize_img(model, img, save_path):
@@ -151,6 +226,36 @@ def visualize_all_images_plus_acc(args, model, imgs, raw_imgs, metadata, gt_bbox
     return np.array([raw_class_acc, raw_iou_acc, raw_iou_acc2, class_acc, iou_acc, iou_acc2]), map_data
 
 
+def target_test(model, img, metadata, gt_bboxes, gt_labels):
+    #TODO: rewrite the function show_result_plus_acc
+    img_mean = metadata['img_norm_cfg']['mean'][::-1]
+    img_std = metadata['img_norm_cfg']['std'][::-1]
+    img = img * img_std + img_mean
+    result = inference_detector(model, img)
+    return test_acc(img, result, model.CLASSES, gt_bboxes, gt_labels)
+
+
+def target_test_all(args, model, imgs, raw_imgs, metadata, gt_bboxes, gt_labels=None):
+    #TODO: only to check the target labels.
+    imgs = imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
+    raw_imgs = raw_imgs.permute(0, 2, 3, 1)[:, :, :, [2, 1, 0]]
+    imgs = imgs.detach().cpu().numpy()
+    raw_imgs = raw_imgs.numpy()
+    raw_total_acc = 0
+    attack_total_acc = 0
+    for index in range(0, np.shape(imgs)[0]):
+        if args.neglect_raw_stat and args.experiment_index > args.resume_experiment:
+            raw_acc = 0
+        else:
+            raw_acc = target_test(model, raw_imgs[index], metadata[index], gt_bboxes[index], gt_labels[index])
+        attack_acc = target_test(model, imgs[index], metadata[index], gt_bboxes[index], gt_labels[index])
+        raw_total_acc += raw_acc
+        attack_total_acc += attack_acc
+
+    return raw_total_acc, attack_total_acc
+
+
+
 def attack(args, datasets):
     cfg = Config.fromfile(args.config)
     cfg.data.workers_per_gpu = args.workers_per_gpu
@@ -187,8 +292,9 @@ def attack(args, datasets):
         set_random_seed(args.seed)
     model = build_detector(cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
     _ = load_checkpoint(model, args.model_path)
+    model.eval()
     if datasets is None:
-        datasets = [build_dataset(cfg.data.train)]
+        datasets = [build_dataset(cfg.data.val)]
     # if len(cfg.workflow) == 2:
     # datasets.append(build_dataset(cfg.data.val))
     if cfg.checkpoint_config is not None:
@@ -210,7 +316,7 @@ def save_to_excel(dict_list, file_name):
 
 
 if __name__ == "__main__":
-    result_dict_list = []
+    result_dict_list = [[],[],[],[],[],[],[]]
     args_raw = parse_args()
     save_keys = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel', 'kernel_size', 'MAP_decrease',
                  'class_accuracy_decrease', 'IoU_accuracy_decrease', 'IoU_accuracy_decrease2', 'MAP_before_attack',
@@ -219,31 +325,43 @@ if __name__ == "__main__":
                  'IoU_accuracy_under_attack2', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
                  'max_attack_batches', 'seed', 'model_path', 'save_path']
     search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel', 'kernel_size']
+    # search_values = [[16.0],
+    #                  [['loss_rpn_bbox', 'loss_cls']],
+    #                  [0,10],
+    #                  [0,1],
+    #                  ['Gaussian'],
+    #                  [0, 3,5,7,9, 11,13, 15,17,19,21]]
+    # search_values = [[12.0,1.0,2.0,4.0,8.0,12.0,16.0],
+    #                  [['loss_rpn_bbox', 'loss_cls']],
+    #                  [10],
+    #                  [1],
+    #                  ['Gaussian'],
+    #                  [0]]
     search_values = [[16.0],
                      [['loss_rpn_bbox', 'loss_cls']],
-                     [1, 10, 20],
-                     [0, 1, 2],
-                     ['Uniform', 'Linear', 'Gaussian'],
-                     [0, 5, 11, 15]]
+                     [10],
+                     [1],
+                     ['Gaussian'],
+                     [15]]
     if args_raw.DIM:
-        search_values = [[16.0],
+        search_values = [[12.0],
                          [['loss_rpn_bbox', 'loss_cls']],
                          [10],
-                         [0, 1, 2],
-                         ['Gaussian'],
-                         [0, 5, 11, 15]]
+                         [1],
+                         ['Gaussian','Uniform','Linear'],
+                         [0]]
     if args_raw.visualize:
         search_values = [[16.0],
                          [['loss_rpn_bbox', 'loss_cls']],
                          [10],
-                         [1],
+                         [0],
                          ['Gaussian'],
                          [15]]
     if args_raw.DAG:
         search_values = [[16.0],
-                         [['loss_cls']],
+                         [['loss_cls_0', 'loss_cls_1']],
                          [10],
-                         [1],
+                         [1,0],
                          ['Gaussian'],
                          [0]]
     if args_raw.model_name == 'retinanet_r50_fpn_1x':
@@ -257,10 +375,10 @@ if __name__ == "__main__":
     if args_raw.model_name == 'rpn_r50_fpn_1x':
         search_values = [[16.0],
                          [['loss_rpn_bbox', 'loss_rpn_cls']],
-                         [1, 10, 20],
-                         [0, 1, 2],
+                         [1, 10, 20], #10
+                         [0, 1, 2], #1
                          ['Uniform', 'Linear', 'Gaussian'],
-                         [0, 5, 11, 15]]
+                         [0, 5, 11, 15]]    #3-21
     args_raw.MAP_before_attack = None
     args_search = copy.deepcopy(args_raw)
     if args_search.black_box_model_path is None:
@@ -271,8 +389,27 @@ if __name__ == "__main__":
         save_file_name = save_file_name[:-5] + '_DAG.xlsx'
     loaded_datasets = None
     experiment_index = 0
+
+    # black_model_names = ['mask_rcnn_r50_fpn_1x', 'ssd512_coco_1x', 'faster_rcnn_r101_fpn_1x','faster_rcnn_x101_64x4d_fpn_1x', 'retinanet_r50_fpn_1x','yolov3']
+    black_model_names = ['faster_rcnn_r101_fpn_1x', 'faster_rcnn_x101_64x4d_fpn_1x', 'retinanet_r50_fpn_1x']
+    # black_model_names = ['faster_rcnn_x101_64x4d_fpn_1x', 'mask_rcnn_x101_64x4d_fpn_1x', 'ssd512_coco_1x', 'retinanet_r101_fpn_1x','yolov3']
+    # black_model_names = ['mask_rcnn_x101_64x4d_fpn_1x']
+    # black_model_names = ['retinanet_r101_fpn_1x']
+    # black_model_names = ['yolov3']
+    save_file_name = []
+    for k in range(1):
+        if k==-1:
+            save_file_name.append(str(datetime.datetime.now()) + '_together.xlsx')
+        else:
+            save_file_name.append(str(datetime.datetime.now()) + '_attack_' + str(black_model_names[k]) + '_together.xlsx')
+
     for search_value in itertools.product(*search_values):
-        save_dict = {}
+        save_dict = [{}]
+        # search_value = list(search_value)
+        # search_value[2] = 10
+        # search_value[3] = 1
+        # search_value[4] = 'Linear'
+        # search_value[5] = 15
         if args_raw.neglect_raw_stat:
             args_search = copy.deepcopy(args_search)
         else:
@@ -281,14 +418,30 @@ if __name__ == "__main__":
             exec('args_search.' + search_dict[i] + ' = search_value[i]')
         if args_search.num_attack_iter == 1 and args_search.momentum > 0:
             continue
+        # if args_search.num_attack_iter == 1 and args_search.kernel_size > 0:
+        #     continue
+        # if args_search.num_attack_iter > 1 and args_search.momentum==0 and args_search.kernel_size>0:
+        #     continue
+        if args_search.momentum == 0 and args_search.kernel_size > 0:
+            continue
+        # if args_search.epsilon<16.0 and (args_search.kernel_size!=5 and args_search.kernel_size!=15):
+        #     continue
+        
         if experiment_index < args_raw.resume_experiment:
             experiment_index = experiment_index + 1
             continue
+        
         args_search.experiment_index = experiment_index
+        print(search_value)
+        
         args_search, loaded_datasets = attack(args_search, loaded_datasets)
-        args_dict = vars(args_search)
-        for key in save_keys:
-            save_dict[key] = args_dict[key]
-        result_dict_list.append(save_dict)
-        save_to_excel(result_dict_list, args_search.work_dir + save_file_name)
+        
+        # for k in range(1):
+        #     args_dict = vars(args_search[k])
+        #     for key in save_keys:
+        #         save_dict[k][key] = args_dict[key]
+        #     result_dict_list[k].append(save_dict[k])
+        #     save_to_excel(result_dict_list[k], args_search[k].work_dir +'/'+ save_file_name[k])
+
+        args_search = args_search[0]
         experiment_index = experiment_index + 1
