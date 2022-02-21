@@ -1,3 +1,5 @@
+#### First install this `mmdetection` as `dev` mode following `docs/INSTALL.md`.
+
 #### Important files: mmdet/apis/train.py, mmdet/apis/inference.py, tools/attack.py, tools/parsing.py
 
 #### Before trying to run the attack, you need to download the pretrained weights according to the mmdetection model zoo and set the checkpoint path in `mmdet/apis/train.py`. Line 601, 651, 653 in `mmdet/apis/train.py` are set according to the number of black models to be evaluated with.
