@@ -94,11 +94,11 @@ def generate_data(args, imgs, is_attack, metadata, gt_bboxes, gt_labels=None):
                 os.makedirs(args.save_path[:-7] + 'images/attack')
             save_path = args.save_path[:-7] + 'images/attack/' + metadata[img_index]['filename'][-16:].split('.')[0]+'.png'
         else:
-            with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_before_attack_target.txt', mode='a') as f:
+            with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_before_attack.txt', mode='a') as f:
                 f.writelines('/data/zhangyic/TPAMI/mmdetection/tools/' + args.save_path[:-7] + 'images/original'
                             + '/' + metadata[img_index]['filename'][-16:].split('.')[0]+'.png')
                 f.writelines('\n')
-            with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_under_attack_target.txt', mode='a') as f:
+            with open('/data/zhangyic/TPAMI/yolov3/data/coco_zyc_under_attack.txt', mode='a') as f:
                 f.writelines('/data/zhangyic/TPAMI/mmdetection/tools/' + args.save_path[:-7] + 'images/attack'
                             + '/' + metadata[img_index]['filename'][-16:].split('.')[0]+'.png')
                 f.writelines('\n')
@@ -325,24 +325,12 @@ if __name__ == "__main__":
                  'IoU_accuracy_under_attack2', 'model_name', 'config', 'work_dir', 'gpus', 'imgs_per_gpu',
                  'max_attack_batches', 'seed', 'model_path', 'save_path']
     search_dict = ['epsilon', 'loss_keys', 'num_attack_iter', 'momentum', 'kernel', 'kernel_size']
-    # search_values = [[16.0],
-    #                  [['loss_rpn_bbox', 'loss_cls']],
-    #                  [0,10],
-    #                  [0,1],
-    #                  ['Gaussian'],
-    #                  [0, 3,5,7,9, 11,13, 15,17,19,21]]
-    # search_values = [[12.0,1.0,2.0,4.0,8.0,12.0,16.0],
-    #                  [['loss_rpn_bbox', 'loss_cls']],
-    #                  [10],
-    #                  [1],
-    #                  ['Gaussian'],
-    #                  [0]]
     search_values = [[16.0],
                      [['loss_rpn_bbox', 'loss_cls']],
                      [10],
-                     [1],
+                     [0,1],
                      ['Gaussian'],
-                     [15]]
+                     [0,5,15]]
     if args_raw.DIM:
         search_values = [[12.0],
                          [['loss_rpn_bbox', 'loss_cls']],
@@ -366,12 +354,7 @@ if __name__ == "__main__":
                          [0]]
     if args_raw.model_name == 'retinanet_r50_fpn_1x':
         search_values[1] = [['loss_cls']]
-    # search_values = [[16.0],
-    #                  [['loss_rpn_bbox', 'loss_cls']],
-    #                  [10],
-    #                  [2],
-    #                  ['Gaussian'],
-    #                  [15]]
+    
     if args_raw.model_name == 'rpn_r50_fpn_1x':
         search_values = [[16.0],
                          [['loss_rpn_bbox', 'loss_rpn_cls']],
@@ -390,26 +373,8 @@ if __name__ == "__main__":
     loaded_datasets = None
     experiment_index = 0
 
-    # black_model_names = ['mask_rcnn_r50_fpn_1x', 'ssd512_coco_1x', 'faster_rcnn_r101_fpn_1x','faster_rcnn_x101_64x4d_fpn_1x', 'retinanet_r50_fpn_1x','yolov3']
-    black_model_names = ['faster_rcnn_r101_fpn_1x', 'faster_rcnn_x101_64x4d_fpn_1x', 'retinanet_r50_fpn_1x']
-    # black_model_names = ['faster_rcnn_x101_64x4d_fpn_1x', 'mask_rcnn_x101_64x4d_fpn_1x', 'ssd512_coco_1x', 'retinanet_r101_fpn_1x','yolov3']
-    # black_model_names = ['mask_rcnn_x101_64x4d_fpn_1x']
-    # black_model_names = ['retinanet_r101_fpn_1x']
-    # black_model_names = ['yolov3']
-    save_file_name = []
-    for k in range(1):
-        if k==-1:
-            save_file_name.append(str(datetime.datetime.now()) + '_together.xlsx')
-        else:
-            save_file_name.append(str(datetime.datetime.now()) + '_attack_' + str(black_model_names[k]) + '_together.xlsx')
-
     for search_value in itertools.product(*search_values):
         save_dict = [{}]
-        # search_value = list(search_value)
-        # search_value[2] = 10
-        # search_value[3] = 1
-        # search_value[4] = 'Linear'
-        # search_value[5] = 15
         if args_raw.neglect_raw_stat:
             args_search = copy.deepcopy(args_search)
         else:
@@ -418,14 +383,9 @@ if __name__ == "__main__":
             exec('args_search.' + search_dict[i] + ' = search_value[i]')
         if args_search.num_attack_iter == 1 and args_search.momentum > 0:
             continue
-        # if args_search.num_attack_iter == 1 and args_search.kernel_size > 0:
-        #     continue
-        # if args_search.num_attack_iter > 1 and args_search.momentum==0 and args_search.kernel_size>0:
-        #     continue
         if args_search.momentum == 0 and args_search.kernel_size > 0:
             continue
-        # if args_search.epsilon<16.0 and (args_search.kernel_size!=5 and args_search.kernel_size!=15):
-        #     continue
+        
         
         if experiment_index < args_raw.resume_experiment:
             experiment_index = experiment_index + 1
@@ -436,12 +396,5 @@ if __name__ == "__main__":
         
         args_search, loaded_datasets = attack(args_search, loaded_datasets)
         
-        # for k in range(1):
-        #     args_dict = vars(args_search[k])
-        #     for key in save_keys:
-        #         save_dict[k][key] = args_dict[key]
-        #     result_dict_list[k].append(save_dict[k])
-        #     save_to_excel(result_dict_list[k], args_search[k].work_dir +'/'+ save_file_name[k])
-
         args_search = args_search[0]
         experiment_index = experiment_index + 1
