@@ -145,7 +145,7 @@ def generate_data(args, imgs, is_attack, metadata, gt_bboxes, gt_labels=None):
 
             
         img = mmcv.imread(imgs[img_index])
-        mmcv.imwrite(img[:org_height,:org_width,:], save_path)
+        mmcv.imwrite(img, save_path)
 
 
 
