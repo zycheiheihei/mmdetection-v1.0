@@ -115,6 +115,11 @@ data
 *.pkl.json
 *.log.json
 work_dirs/
+target/
+weigths/
+.out
+.png
+.txt
 
 # Pytorch
 *.pth
